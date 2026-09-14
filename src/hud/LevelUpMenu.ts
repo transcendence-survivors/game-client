@@ -4,15 +4,20 @@ import { createFullscreenUi } from '../assets/ui';
 import type { Room } from '@colyseus/sdk';
 import {
 	ClientMessage,
-	RARITY_CONFIG,
 	ServerMessage,
 	UPGRADE_CHOICE_COUNT,
 	type UpgradeOption,
 } from '@transcendence/game-shared';
 import { iconsImport } from '../assets/icons';
 import { CleanupBag } from '../CleanupBag';
-import { HUD_THEME, hudText, styleHudPanel } from '../hud/HudTheme';
+import { HUD_THEME } from '../hud/HudTheme';
 import { guiImports } from '../assets/ui';
+import {
+	gameI18n,
+	localizeUpgradeCategory,
+	localizeUpgradeDescription,
+	localizeUpgradeTitle,
+} from '../i18n';
 
 interface UpgradeCardControls {
 	panel: GUI.Rectangle;
@@ -28,7 +33,6 @@ interface UpgradeCardControls {
 	accentColor: string;
 }
 
-const LEVEL_UP_SCALE = 0.75;
 const RARITY_COLORS: Readonly<Record<UpgradeOption['rarity'], string>> = {
 	common: '#B8C4C0FF',
 	uncommon: '#58D68DFF',
@@ -36,14 +40,6 @@ const RARITY_COLORS: Readonly<Record<UpgradeOption['rarity'], string>> = {
 	epic: '#C56CFFFF',
 	legendary: HUD_THEME.goldBright,
 };
-function splitCardTitle(name: string): { title: string; level: string } {
-	const levelledName = /^(.*?) · Niv\. (\d+)$/.exec(name);
-	if (!levelledName) return { title: name, level: '' };
-	return {
-		title: levelledName[1],
-		level: `NIVEAU ${levelledName[2]}`,
-	};
-}
 
 export class LevelUpMenu {
 	private advTex!: GUI.AdvancedDynamicTexture;
@@ -69,6 +65,11 @@ export class LevelUpMenu {
 			'LevelUpRoot',
 		) as GUI.Rectangle;
 		this.levelUpRootContainer.isVisible = false;
+		(this.advTex.getControlByName('LevelUpHeading') as GUI.TextBlock).text =
+			gameI18n.t('upgrade.heading');
+		(
+			this.advTex.getControlByName('LevelUpSubtitle') as GUI.TextBlock
+		).text = gameI18n.t('upgrade.subtitle');
 		this.cards = Array.from({ length: UPGRADE_CHOICE_COUNT }, (_, index) =>
 			this.getCardControls(index),
 		);
@@ -147,15 +148,12 @@ export class LevelUpMenu {
 			panel.isVisible = Boolean(option);
 			if (!option) return;
 			icon.source = iconsImport[option.iconUrl];
-			const cardTitle = splitCardTitle(option.name);
+			const cardTitle = localizeUpgradeTitle(option);
 			title.text = cardTitle.title;
 			title.top = cardTitle.level ? '141px' : '153px';
 			level.text = cardTitle.level;
 			level.isVisible = Boolean(cardTitle.level);
-			description.text =
-				option.category === 'unlock'
-					? 'Ajoutée à votre arsenal'
-					: option.description;
+			description.text = localizeUpgradeDescription(option);
 			const color =
 				option.category === 'unlock'
 					? HUD_THEME.goldBright
@@ -168,10 +166,7 @@ export class LevelUpMenu {
 			separator.background = color;
 			rarityBadge.color = color;
 			rarityText.color = color;
-			rarityText.text =
-				option.category === 'unlock'
-					? 'NOUVELLE ARME'
-					: `${option.category === 'tome' ? 'TOME' : 'ARME'} · ${RARITY_CONFIG[option.rarity].label.toUpperCase()}`;
+			rarityText.text = localizeUpgradeCategory(option).toUpperCase();
 		});
 	}
 

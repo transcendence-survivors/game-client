@@ -6,70 +6,84 @@ import { guiImports } from '../assets/ui';
 import { SceneManager } from './SceneManager';
 import type { PlayerStats } from '../../../shared-package/src/schemas/GameState';
 import { iconsImport } from '../assets/icons';
+import { gameI18n, type TranslationKey } from '../i18n';
+import { setText } from '../i18n/gui';
 
 interface StatDef {
 	key: keyof PlayerStats;
-	label: string;
+	labelKey: TranslationKey;
 	icon: string;
 	format?: (v: number) => string;
 }
 
 const STAT_DEFS: StatDef[] = [
-	{ key: 'attackDamage', label: 'Damage', icon: iconsImport.tomeDamage },
+	{
+		key: 'attackDamage',
+		labelKey: 'stats.damage',
+		icon: iconsImport.tomeDamage,
+	},
 	{
 		key: 'attackSpeed',
-		label: 'Attack Speed',
+		labelKey: 'stats.attackSpeed',
 		icon: iconsImport.attackSpeed,
 		format: (v) => `${v.toFixed(2)}/s`,
 	},
-	{ key: 'moveSpeed', label: 'Move Speed', icon: iconsImport.tomeAgility },
+	{
+		key: 'moveSpeed',
+		labelKey: 'stats.moveSpeed',
+		icon: iconsImport.tomeAgility,
+	},
 	{
 		key: 'armor',
-		label: 'Armor',
+		labelKey: 'stats.armor',
 		icon: iconsImport.tomeArmor,
 		format: (v) => `${Math.round(v)}`,
 	},
 	{
 		key: 'lifesteal',
-		label: 'Lifesteal',
+		labelKey: 'stats.lifesteal',
 		icon: iconsImport.tomeBlood,
 		format: (v) => `${v.toFixed(1)}%`,
 	},
-	{ key: 'range', label: 'Range', icon: iconsImport.tomeRange },
-	{ key: 'maxHealth', label: 'Max Health', icon: iconsImport.tomeVitality },
+	{ key: 'range', labelKey: 'stats.range', icon: iconsImport.tomeRange },
+	{
+		key: 'maxHealth',
+		labelKey: 'stats.maxHealth',
+		icon: iconsImport.tomeVitality,
+	},
 	{
 		key: 'size',
-		label: 'Size',
+		labelKey: 'stats.size',
 		icon: iconsImport.tomeSize,
 		format: (v) => `${(v * 100).toFixed(0)}%`,
 	},
 	{
 		key: 'duration',
-		label: 'Duration',
+		labelKey: 'stats.duration',
 		icon: iconsImport.tomeDuration,
 		format: (v) => `${(v * 100).toFixed(0)}%`,
 	},
 	{
 		key: 'quantity',
-		label: 'Quantity',
+		labelKey: 'stats.quantity',
 		icon: iconsImport.tomeQuantity,
 		format: (v) => `+${Math.round(v)}`,
 	},
 	{
 		key: 'penetration',
-		label: 'Penetration',
+		labelKey: 'stats.penetration',
 		icon: iconsImport.penetration,
 		format: (v) => `+${Math.round(v)}`,
 	},
 	{
 		key: 'luck',
-		label: 'Luck',
+		labelKey: 'stats.luck',
 		icon: iconsImport.tomeFortune,
 		format: (v) => `${v.toFixed(2)}x`,
 	},
 	{
 		key: 'killAmount',
-		label: 'Kills',
+		labelKey: 'stats.kills',
 		icon: iconsImport.kills,
 		format: (v) => `${Math.round(v)}`,
 	},
@@ -108,6 +122,8 @@ export class EndingScreen {
 		this.advTex.idealHeight = 1080;
 		this.advTex.renderAtIdealSize = true;
 		await this.advTex.parseFromURLAsync(guiImports.endingScreen);
+		setText(this.advTex, 'GameOver', gameI18n.t('ending.gameOver'));
+		setText(this.advTex, 'BTL_txt', gameI18n.t('ending.backToLobby'));
 		this.fillStats();
 		this.connectButton();
 	}
@@ -137,7 +153,9 @@ export class EndingScreen {
 
 			icon.source = def.icon;
 			const rawValue = stats[def.key] as number;
-			text.text = `${def.label}: ${def.format ? def.format(rawValue) : rawValue}`;
+			text.text = `${gameI18n.t(def.labelKey)}: ${
+				def.format ? def.format(rawValue) : rawValue
+			}`;
 		});
 	}
 

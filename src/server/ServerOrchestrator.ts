@@ -11,7 +11,6 @@ import {
 	type Player,
 	ClientMessage,
 	ServerMessage,
-	type WorldSeedMessage,
 	type Vec3d,
 	PLAYER_ACCESS_RADIUS,
 	createMoveInput,

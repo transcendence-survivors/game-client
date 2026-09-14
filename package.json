@@ -22,6 +22,7 @@
 		"@colyseus/sdk": "^0.17.43"
 	},
 	"devDependencies": {
+		"@types/node": "^20.19.43",
 		"typescript": "~5.9.3",
 		"vitest": "^4.1.5"
 	}

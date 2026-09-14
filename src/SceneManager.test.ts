@@ -1,6 +1,6 @@
 import type { Engine } from '@babylonjs/core';
 import { describe, expect, it, vi } from 'vitest';
-import { type ManagedScene, SceneManager } from './SceneManager';
+import { type ManagedScene, SceneManager } from './scenes/SceneManager';
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
 	let resolve!: () => void;

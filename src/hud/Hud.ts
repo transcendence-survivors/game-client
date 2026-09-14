@@ -5,7 +5,6 @@ import {
 	COMBAT_LIMITS,
 	WEAPON_ICONS,
 	WEAPON_KINDS,
-	WEAPON_NAMES,
 	type GameState,
 	type Monster,
 	type Player,
@@ -23,6 +22,7 @@ import {
 	createHudBar,
 } from './HudPrimitives';
 import { formatGameTime, hudBarWidth, isLivingBoss } from './HudFormatting';
+import { gameI18n, type TranslationKey } from '../i18n';
 
 interface HudControls {
 	hpBar: GUI.Rectangle;
@@ -66,6 +66,13 @@ const TEAM_HEADER_HEIGHT = 36;
 const TEAM_SLOT_HEIGHT = 44;
 const compareIds = (first: string, second: string): number =>
 	first.localeCompare(second);
+const WEAPON_NAME_KEYS: Readonly<Record<WeaponKind, TranslationKey>> = {
+	aura: 'weapon.aura',
+	sword: 'weapon.sword',
+	axe: 'weapon.axe',
+	staff: 'weapon.staff',
+	bow: 'weapon.bow',
+};
 
 export class Hud {
 	private readonly advTex: GUI.AdvancedDynamicTexture;
@@ -216,7 +223,7 @@ export class Hud {
 		root.addControl(killPanel);
 		const killLabel = hudText(
 			'KillCounterLabel',
-			'ÉLIMINATIONS',
+			gameI18n.t('hud.kills').toUpperCase(),
 			13,
 			HUD_THEME.muted,
 		);
@@ -253,7 +260,7 @@ export class Hud {
 
 		const teamLabel = hudText(
 			'NetworkTeamLabel',
-			'ÉQUIPE EN LIGNE',
+			gameI18n.t('hud.onlineTeam').toUpperCase(),
 			11,
 			HUD_THEME.xp,
 		);
@@ -303,7 +310,12 @@ export class Hud {
 		bossPanel.isVisible = false;
 		styleHudPanel(bossPanel, HUD_THEME.boss);
 		root.addControl(bossPanel);
-		const bossName = hudText('BossNameText', 'BOSS', 21, HUD_THEME.boss);
+		const bossName = hudText(
+			'BossNameText',
+			gameI18n.t('hud.boss').toUpperCase(),
+			21,
+			HUD_THEME.boss,
+		);
 		bossName.fontWeight = 'bold';
 		bossName.height = '34px';
 		bossName.top = '6px';
@@ -322,7 +334,7 @@ export class Hud {
 		const bossHealthText = addHudBarText(
 			bossBar.track,
 			'BossHealth',
-			'VIE',
+			gameI18n.t('hud.health').toUpperCase(),
 			'0 / 0',
 			'boss',
 		);
@@ -337,7 +349,7 @@ export class Hud {
 		);
 		const timerLabel = hudText(
 			'GameTimerLabel',
-			'TEMPS DE SURVIE',
+			gameI18n.t('hud.survivalTime').toUpperCase(),
 			11,
 			HUD_THEME.gold,
 		);
@@ -384,7 +396,7 @@ export class Hud {
 		vitalsPanel.addControl(levelBadge);
 		const levelLabel = hudText(
 			'PlayerLevelLabel',
-			'NIVEAU',
+			gameI18n.t('hud.level').toUpperCase(),
 			10,
 			HUD_THEME.muted,
 		);
@@ -417,7 +429,7 @@ export class Hud {
 		const hpText = addHudBarText(
 			hpBar.track,
 			'Health',
-			'VIE',
+			gameI18n.t('hud.health').toUpperCase(),
 			'100 / 100',
 			'health',
 		);
@@ -435,7 +447,7 @@ export class Hud {
 		const xpText = addHudBarText(
 			xpBar.track,
 			'Experience',
-			'EXP',
+			gameI18n.t('hud.experience').toUpperCase(),
 			'0 / 100',
 			'experience',
 		);
@@ -451,7 +463,7 @@ export class Hud {
 
 		const arsenalLabel = hudText(
 			'PlayerArsenalLabel',
-			'ARSENAL',
+			gameI18n.t('hud.arsenal').toUpperCase(),
 			11,
 			HUD_THEME.gold,
 		);
@@ -546,7 +558,7 @@ export class Hud {
 
 		const name = hudText(
 			`NetworkTeammate${index}Name`,
-			`ALLIÉ ${index + 1}`,
+			gameI18n.t('hud.ally', { number: index + 1 }).toUpperCase(),
 			11,
 			HUD_THEME.text,
 		);
@@ -619,7 +631,7 @@ export class Hud {
 
 		const name = hudText(
 			`PlayerWeaponSlot${index}Name`,
-			'VIDE',
+			gameI18n.t('hud.empty').toUpperCase(),
 			9,
 			HUD_THEME.empty,
 		);
@@ -708,7 +720,9 @@ export class Hud {
 			slot.status.color = living
 				? HUD_THEME.allyOnline
 				: HUD_THEME.allyDown;
-			slot.name.text = `ALLIÉ ${index + 1}${living ? '' : ' · K.O.'}`;
+			slot.name.text = `${gameI18n
+				.t('hud.ally', { number: index + 1 })
+				.toUpperCase()}${living ? '' : ` · ${gameI18n.t('hud.knockedOut').toUpperCase()}`}`;
 			slot.name.color = living ? HUD_THEME.text : HUD_THEME.boss;
 			slot.healthText.text = `${Math.round(current)} / ${Math.round(max)}`;
 			slot.healthFill.width = hudBarWidth(current, max);
@@ -742,7 +756,7 @@ export class Hud {
 			slot.panel.color = HUD_THEME.emptyBorder;
 			slot.panel.background = '#0B1417D9';
 			slot.icon.isVisible = false;
-			slot.name.text = 'VIDE';
+			slot.name.text = gameI18n.t('hud.empty').toUpperCase();
 			slot.name.color = HUD_THEME.empty;
 			slot.level.isVisible = false;
 			return;
@@ -751,7 +765,7 @@ export class Hud {
 		slot.panel.background = '#172326F2';
 		slot.icon.source = iconsImport[WEAPON_ICONS[kind]];
 		slot.icon.isVisible = true;
-		slot.name.text = WEAPON_NAMES[kind].toUpperCase();
+		slot.name.text = gameI18n.t(WEAPON_NAME_KEYS[kind]).toUpperCase();
 		slot.name.color = HUD_THEME.text;
 		slot.level.text = String(level);
 		slot.level.isVisible = true;
@@ -772,7 +786,7 @@ export class Hud {
 		}
 
 		panel.isVisible = true;
-		name.text = `BOSS · ${getMonsterDisplayName(boss.kind)}`;
+		name.text = `${gameI18n.t('hud.boss').toUpperCase()} · ${getMonsterDisplayName(boss.kind)}`;
 		const current = boss.life.current;
 		const max = boss.life.max;
 		fill.width = hudBarWidth(current, max, 96);

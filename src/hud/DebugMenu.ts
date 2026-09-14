@@ -5,6 +5,7 @@ import { createFullscreenUi } from '../assets/ui';
 import { HUD_THEME, hudText, styleHudPanel } from '../hud/HudTheme';
 import type { MonsterRendererStats } from '../monsters/MonsterRenderer';
 import { FrameTimeHistory } from '../performance/FrameTimeHistory';
+import { gameI18n } from '../i18n';
 
 const FRAME_TIME_WINDOW_MS = 60_000;
 const GPU_NANOSECONDS_TO_MILLISECONDS = 1_000_000;
@@ -146,7 +147,12 @@ export class DebugMenu {
 		header.width = '370px';
 		header.height = '44px';
 		panel.addControl(header);
-		const title = hudText('DebugTitle', 'DIAGNOSTIC', 20, HUD_THEME.text);
+		const title = hudText(
+			'DebugTitle',
+			gameI18n.t('debug.title'),
+			20,
+			HUD_THEME.text,
+		);
 		title.fontWeight = 'bold';
 		title.width = '246px';
 		title.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
@@ -162,7 +168,7 @@ export class DebugMenu {
 		header.addControl(shortcut);
 		const shortcutText = hudText(
 			'DebugShortcutText',
-			'F3  MASQUER',
+			`F3  ${gameI18n.t('debug.hide').toUpperCase()}`,
 			11,
 			HUD_THEME.xp,
 		);
@@ -182,7 +188,7 @@ export class DebugMenu {
 				GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
 			panel.addControl(section);
 		};
-		addSection('TEMPS RÉEL');
+		addSection(gameI18n.t('debug.realTime').toUpperCase());
 
 		const addStatLine = (label: string) => {
 			const row = new GUI.StackPanel(`DebugStat${label}`);
@@ -215,22 +221,22 @@ export class DebugMenu {
 			return valueBlock;
 		};
 		this.debugStats = {
-			position: addStatLine('Position:'),
-			rotation: addStatLine('Rotation:'),
-			fps: addStatLine('FPS:'),
-			frameTime: addStatLine('Frame:'),
-			cpuFrameTime: addStatLine('CPU frame:'),
-			cpuFrameAverage: addStatLine('CPU avg 60s:'),
-			gpuFrameTime: addStatLine('GPU frame:'),
-			gpuFrameAverage: addStatLine('GPU avg 60s:'),
-			drawCalls: addStatLine('Draw calls:'),
-			resources: addStatLine('Resources:'),
-			animations: addStatLine('Animations:'),
-			skinning: addStatLine('Skinning:'),
-			animationTime: addStatLine('Anim. CPU:'),
-			monsters: addStatLine('Monstres:'),
+			position: addStatLine(gameI18n.t('debug.position')),
+			rotation: addStatLine(gameI18n.t('debug.rotation')),
+			fps: addStatLine(gameI18n.t('debug.fps')),
+			frameTime: addStatLine(gameI18n.t('debug.frame')),
+			cpuFrameTime: addStatLine(gameI18n.t('debug.cpuFrame')),
+			cpuFrameAverage: addStatLine(gameI18n.t('debug.cpuAverage')),
+			gpuFrameTime: addStatLine(gameI18n.t('debug.gpuFrame')),
+			gpuFrameAverage: addStatLine(gameI18n.t('debug.gpuAverage')),
+			drawCalls: addStatLine(gameI18n.t('debug.drawCalls')),
+			resources: addStatLine(gameI18n.t('debug.resources')),
+			animations: addStatLine(gameI18n.t('debug.animations')),
+			skinning: addStatLine(gameI18n.t('debug.skinning')),
+			animationTime: addStatLine(gameI18n.t('debug.animationCpu')),
+			monsters: addStatLine(gameI18n.t('debug.monsters')),
 		};
-		addSection('OUTILS DE TEST');
+		addSection(gameI18n.t('debug.testTools').toUpperCase());
 
 		const addToggle = (
 			name: string,
@@ -260,7 +266,7 @@ export class DebugMenu {
 		};
 		addToggle(
 			'hitboxToggle',
-			'Hitboxes 3D',
+			gameI18n.t('debug.hitboxes'),
 			'#ff8b72',
 			'#ff5c5c',
 			this.hitboxesVisible,
@@ -271,7 +277,7 @@ export class DebugMenu {
 		);
 		addToggle(
 			'immortalToggle',
-			'Mode immortel',
+			gameI18n.t('debug.immortalMode'),
 			'#ffd166',
 			'#ffd166',
 			false,
@@ -279,7 +285,9 @@ export class DebugMenu {
 		);
 		addToggle(
 			'monsterStressToggle',
-			`Stress ${MONSTER_DIRECTOR_CONFIG.stressTestPopulation} monstres`,
+			gameI18n.t('debug.stressMonsters', {
+				count: MONSTER_DIRECTOR_CONFIG.stressTestPopulation,
+			}),
 			'#ff7bff',
 			'#ff7bff',
 			false,
@@ -344,14 +352,21 @@ export class DebugMenu {
 			this.formatMilliseconds(gpuAverageMs);
 		const scene = player.getScene();
 		const monsterStats = this.getMonsterStats();
-		this.debugStats.monsters.text =
-			`${monsterStats.total} (${monsterStats.elites} élites / ${monsterStats.bosses} boss / ` +
-			`${monsterStats.rendered} visibles)`;
+		this.debugStats.monsters.text = gameI18n.t('debug.monsterSummary', {
+			total: monsterStats.total,
+			elites: monsterStats.elites,
+			bosses: monsterStats.bosses,
+			rendered: monsterStats.rendered,
+		});
 		this.debugStats.drawCalls.text = String(this.lastDrawCalls);
-		this.debugStats.resources.text = `${scene.meshes.length} meshes / ${scene.materials.length} materials`;
-		this.debugStats.animations.text =
-			`${scene.animatables.length} animatables / ` +
-			`${scene.getActiveBones()} active bones`;
+		this.debugStats.resources.text = gameI18n.t('debug.resourceSummary', {
+			meshes: scene.meshes.length,
+			materials: scene.materials.length,
+		});
+		this.debugStats.animations.text = gameI18n.t('debug.animationSummary', {
+			animatables: scene.animatables.length,
+			bones: scene.getActiveBones(),
+		});
 		let gpuMeshes = 0;
 		let cpuMeshes = 0;
 		for (const mesh of scene.meshes) {
@@ -359,7 +374,10 @@ export class DebugMenu {
 			if (mesh.computeBonesUsingShaders) gpuMeshes++;
 			else cpuMeshes++;
 		}
-		this.debugStats.skinning.text = `${gpuMeshes} GPU meshes / ${cpuMeshes} CPU meshes`;
+		this.debugStats.skinning.text = gameI18n.t('debug.skinningSummary', {
+			gpu: gpuMeshes,
+			cpu: cpuMeshes,
+		});
 		this.debugStats.animationTime.text = `${this.instrumentation.animationsTimeCounter.current.toFixed(2)} ms`;
 	}
 
@@ -390,6 +408,8 @@ export class DebugMenu {
 	}
 
 	private formatMilliseconds(valueMs: number | null): string {
-		return valueMs === null ? 'N/D' : `${valueMs.toFixed(2)} ms`;
+		return valueMs === null
+			? gameI18n.t('debug.notAvailable')
+			: `${valueMs.toFixed(2)} ms`;
 	}
 }

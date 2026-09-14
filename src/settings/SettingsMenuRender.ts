@@ -7,6 +7,8 @@ import {
 	KEY_ACTIONS,
 	type KeyBindings,
 } from './KeyBindings';
+import { gameI18n } from '../i18n';
+import { setText } from '../i18n/gui';
 
 interface SettingsControls {
 	fovSlider: GUI.Slider;
@@ -53,6 +55,7 @@ export class SettingsMenuRender {
 		}
 		await this.advTex.parseFromURLAsync(guiImports.settings);
 		this.advTex.rootContainer.isVisible = false;
+		this.applyTranslations();
 		this.updatePointerEvents();
 		this.linkControls();
 	}
@@ -148,7 +151,10 @@ export class SettingsMenuRender {
 			button.textBlock ??
 			button.children.find((child) => child instanceof GUI.TextBlock);
 		if (textBlock)
-			textBlock.text = label === ' ' ? 'SPACE' : label.toUpperCase();
+			textBlock.text =
+				label === ' '
+					? gameI18n.t('settings.space')
+					: label.toUpperCase();
 	}
 
 	private resetKeybinds() {
@@ -169,7 +175,7 @@ export class SettingsMenuRender {
 	private showRebindError(action: keyof KeyBindings) {
 		const button = this.keyButtons[action];
 
-		this.setButtonLabel(button, 'RESERVED');
+		this.setButtonLabel(button, gameI18n.t('settings.reserved'));
 
 		setTimeout(() => {
 			if (this.awaitingBindFor === action) {
@@ -179,4 +185,23 @@ export class SettingsMenuRender {
 	}
 
 	private boundKeyDown = (e: KeyboardEvent) => this.handleRebindKeyDown(e);
+
+	private applyTranslations(): void {
+		const labels = {
+			Title: 'settings.title',
+			FovLabel: 'settings.fieldOfView',
+			KeysLabel: 'settings.keyBindings',
+			Label_Forward: 'settings.moveForward',
+			Label_Backward: 'settings.moveBackward',
+			Label_Left: 'settings.moveLeft',
+			Label_Right: 'settings.moveRight',
+			Label_Jump: 'settings.jump',
+			ButtonReset_text: 'settings.resetDefaults',
+			ButtonBack_text: 'settings.back',
+		} as const;
+
+		for (const [controlName, key] of Object.entries(labels)) {
+			setText(this.advTex, controlName, gameI18n.t(key));
+		}
+	}
 }

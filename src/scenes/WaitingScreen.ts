@@ -5,6 +5,8 @@ import type { GameState, Player } from '../../../shared-package/src';
 import { iconsImport } from '../assets/icons';
 import { guiImports } from '../assets/ui';
 import { SceneManager } from './SceneManager';
+import { gameI18n } from '../i18n';
+import { setText } from '../i18n/gui';
 
 export class WaitingScreen {
 	private advTex!: GUI.AdvancedDynamicTexture;
@@ -42,6 +44,8 @@ export class WaitingScreen {
 		this.advTex.idealHeight = 1080;
 		this.advTex.renderAtIdealSize = true;
 		await this.advTex.parseFromURLAsync(guiImports.waitingScreen);
+		setText(this.advTex, 'Title', gameI18n.t('menu.title'));
+		setText(this.advTex, 'ReadyText', gameI18n.t('waiting.notReady'));
 		this.fillData();
 		this.connectButton();
 	}
@@ -58,7 +62,7 @@ export class WaitingScreen {
 			this.setSlot(i + 1, null);
 		}
 
-		eventsCallbacks(this.room.state).players.onAdd((player, sessionId) => {
+		eventsCallbacks(this.room.state).players.onAdd((player) => {
 			if (player.id) this.setSlot(player.id, player);
 
 			eventsCallbacks(player).onChange(() => {
@@ -125,7 +129,9 @@ export class WaitingScreen {
 			}
 			const newReady = !player.ready;
 			this.room.send('ready', newReady);
-			text.text = newReady ? 'Ready' : 'NotReady';
+			text.text = gameI18n.t(
+				newReady ? 'waiting.ready' : 'waiting.notReady',
+			);
 		});
 	}
 }
