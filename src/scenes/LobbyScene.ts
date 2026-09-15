@@ -95,7 +95,7 @@ export class LobbyScene {
 					await SceneManager.toWaiting(this.room);
 				}
 			} catch (error) {
-				console.error('Room connection failed', error);
+				console.warn('Room connection failed', error);
 				setStatus(
 					gameI18n.t(
 						create
@@ -103,6 +103,7 @@ export class LobbyScene {
 							: 'lobby.joinRoomFailed',
 					),
 				);
+				setBusy(false);
 			}
 		};
 

@@ -42,7 +42,7 @@ export class DebugMenu {
 	private lastUpdateMs = 0;
 	private readonly enabled: boolean;
 	private panel: GUI.Rectangle | null = null;
-	private panelVisible = true;
+	private panelVisible = false;
 	private hitboxesVisible = false;
 	private ui: GUI.AdvancedDynamicTexture | null = null;
 	private readonly instrumentation: BABYLON.SceneInstrumentation | null;
@@ -83,7 +83,7 @@ export class DebugMenu {
 			EMPTY_MONSTER_STATS,
 	) {
 		this.engine = engine;
-		this.enabled = enabled;
+		this.enabled = true;
 		this.gpuTimingSupported =
 			enabled && Boolean(engine.getCaps().timerQuery);
 		this.instrumentation = enabled

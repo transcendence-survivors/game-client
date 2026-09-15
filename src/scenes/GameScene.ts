@@ -427,9 +427,15 @@ export class GameScene {
 		);
 	}
 
-	private boundOnClick = async () => {
+	private boundOnClick = () => {
 		if (this.settings.isOpen()) return;
-		await this.engine.getRenderingCanvas()?.requestPointerLock();
+		const canvas = this.engine.getRenderingCanvas();
+		if (!canvas) return;
+		try {
+			canvas.requestPointerLock();
+		} catch (error) {
+			console.log('Pointer Lock unavailable', error);
+		}
 	};
 
 	private boundOnMouseMove = (e: MouseEvent) => {
