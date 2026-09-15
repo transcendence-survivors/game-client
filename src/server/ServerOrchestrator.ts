@@ -29,6 +29,10 @@ import { CombatAssetLibrary } from '../combat/CombatAssetLibrary';
 import { WeaponAttachmentRenderer } from '../combat/WeaponAttachmentRenderer';
 import { AsyncViewRegistry } from '../combat/AsyncViewRegistry';
 import { CleanupBag, CleanupRegistry } from '../CleanupBag';
+import {
+	STORAGE_COLYSEUS_ROOM_ID_STR,
+	STORAGE_COLYSEUS_TOKEN_ID_STR,
+} from '../scenes/LobbyScene';
 
 class RemotePlayerView {
 	readonly mesh: BABYLON.AbstractMesh;
@@ -265,6 +269,8 @@ export class ServerOrchestrator {
 			this.room.onMessage(ServerMessage.GameOver, () => {
 				if (this.gameOverHandled) return;
 				this.gameOverHandled = true;
+				sessionStorage.removeItem(STORAGE_COLYSEUS_ROOM_ID_STR);
+				sessionStorage.removeItem(STORAGE_COLYSEUS_TOKEN_ID_STR);
 				document.exitPointerLock();
 				SceneManager.toEndScreen(this.room);
 			}),

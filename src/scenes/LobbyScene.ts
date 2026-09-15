@@ -15,6 +15,9 @@ interface LobbyControls {
 	status: GUI.TextBlock;
 }
 
+export const STORAGE_COLYSEUS_TOKEN_ID_STR = 'colyseus_reconnection_token';
+export const STORAGE_COLYSEUS_ROOM_ID_STR = 'colyseus_room_id';
+
 export class LobbyScene {
 	private scene: BABYLON.Scene;
 	private advTex!: GUI.AdvancedDynamicTexture;
@@ -39,11 +42,47 @@ export class LobbyScene {
 		await this.advTex.parseFromURLAsync(guiImports.lobby);
 		this.applyTranslations();
 		this.linkControls();
+		await this.tryReconnect();
 	}
 
 	dispose() {
 		this.advTex.dispose();
 		this.scene.dispose();
+	}
+
+	private async tryReconnect() {
+		const token = sessionStorage.getItem(STORAGE_COLYSEUS_TOKEN_ID_STR);
+		if (!token) return false;
+
+		const { status } = getGuiControls<LobbyControls>(this.advTex, {
+			input: 'RoomNameInput',
+			createButton: 'ButtonCreate',
+			joinButton: 'ButtonJoin',
+			status: 'StatusText',
+		});
+
+		status.text = gameI18n.t('lobby.joiningRoom');
+
+		try {
+			this.room = await this.network.getClient().reconnect(token);
+			sessionStorage.setItem(
+				STORAGE_COLYSEUS_TOKEN_ID_STR,
+				this.room.reconnectionToken,
+			);
+			sessionStorage.setItem(
+				STORAGE_COLYSEUS_ROOM_ID_STR,
+				this.room.roomId,
+			);
+
+			await SceneManager.toGame(this.room, this.room.state.seed);
+			return true;
+		} catch (error) {
+			console.warn('Reconnection failed', error);
+			sessionStorage.removeItem(STORAGE_COLYSEUS_TOKEN_ID_STR);
+			sessionStorage.removeItem(STORAGE_COLYSEUS_ROOM_ID_STR);
+			status.text = '';
+			return false;
+		}
 	}
 
 	private linkControls() {
@@ -85,6 +124,14 @@ export class LobbyScene {
 				this.room = create
 					? await this.network.createRoom(roomName)
 					: await this.network.joinRoomByName(roomName);
+				sessionStorage.setItem(
+					STORAGE_COLYSEUS_TOKEN_ID_STR,
+					this.room.reconnectionToken,
+				);
+				sessionStorage.setItem(
+					STORAGE_COLYSEUS_ROOM_ID_STR,
+					this.room.roomId,
+				);
 				setStatus(
 					create
 						? gameI18n.t('lobby.roomCreated', { roomName })

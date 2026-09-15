@@ -14,6 +14,10 @@ export class NetworkManager {
 		this.client = new Client(`ws://${host}:4000`);
 	}
 
+	getClient() {
+		return this.client;
+	}
+
 	createRoom(rawName: string) {
 		return this.client.create<GameState>(
 			GAME_ROOM_TYPE,
