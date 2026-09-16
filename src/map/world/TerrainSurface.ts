@@ -7,7 +7,6 @@ export interface TerrainSurfaceData {
 	readonly segments: number;
 	readonly heights: Float32Array;
 	readonly normals: Float32Array;
-	/** Releases a worker-owned generation buffer after the mesh copies it. */
 	readonly release?: () => void;
 }
 
@@ -15,7 +14,6 @@ export function terrainSurfaceSegments(world: World): number {
 	return world.N * TERRAIN_SUBDIVISIONS_PER_CELL;
 }
 
-/** Generates only the deterministic surface samples needed by a terrain mesh. */
 export function generateTerrainSurface(
 	world: World,
 	chunkX: number,
@@ -30,7 +28,6 @@ export function generateTerrainSurface(
 	return { segments, heights, normals };
 }
 
-/** Writes deterministic terrain samples directly into caller-owned buffers. */
 export function writeTerrainSurface(
 	world: World,
 	chunkX: number,
@@ -41,10 +38,7 @@ export function writeTerrainSurface(
 	const segments = terrainSurfaceSegments(world);
 	const row = segments + 1;
 	const vertexCount = row * row;
-	if (
-		heights.length < vertexCount ||
-		normals.length < vertexCount * 3
-	)
+	if (heights.length < vertexCount || normals.length < vertexCount * 3)
 		throw new Error('Terrain surface output buffers are too small');
 
 	const cellSize = world.CELL;

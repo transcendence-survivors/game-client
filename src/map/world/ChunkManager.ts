@@ -24,11 +24,6 @@ const MAX_TERRAIN_GENERATIONS_IN_FLIGHT = 2;
 const MAX_TERRAIN_PUBLICATIONS_PER_TASK = 1;
 const TERRAIN_PUBLICATION_BUDGET_MS = 3;
 
-/**
- * Streams terrain samples asynchronously. The expensive deterministic surface
- * evaluation runs in WorldGenerationWorker; Babylon mesh creation is limited
- * to one completed chunk per task and never starts from onBeforeRender.
- */
 export class ChunkManager {
 	private readonly scene: Scene;
 	private readonly world: World;
@@ -121,8 +116,6 @@ export class ChunkManager {
 			}
 		}
 
-		// No queue and no asynchronous work means this position cannot change
-		// the terrain state. This keeps the render callback allocation-free.
 		if (
 			!cellChanged &&
 			this.queueIndex >= this.queue.length &&
@@ -328,10 +321,7 @@ export class ChunkManager {
 		if (!cameraChanged && !centerChanged) return;
 
 		if (cameraChanged)
-			Frustum.GetPlanesToRef(
-				transformation,
-				this.frustumPlanes,
-			);
+			Frustum.GetPlanesToRef(transformation, this.frustumPlanes);
 		for (const loaded of this.chunks.values()) {
 			const visible =
 				this.intersectsDisplayCircle(

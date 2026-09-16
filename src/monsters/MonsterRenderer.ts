@@ -137,9 +137,6 @@ export class MonsterRenderer {
 
 	listen(): void {
 		const callbacks = COLYSEUS.Callbacks.get(this.room);
-		// Preload the announced boss immediately when none is active. Future bosses
-		// are deliberately delayed so preparing the next GLB cannot happen
-		// in the same frame as the current boss enters the room.
 		let activeBoss = false;
 		this.room.state.monsters.forEach((monster) => {
 			if (!monster.isBoss) return;
@@ -158,8 +155,6 @@ export class MonsterRenderer {
 			callbacks.onAdd('monsters', (monster, monsterId) => {
 				if (monster.isElite) this.eliteMonsterCount++;
 				if (monster.isBoss) this.bossMonsterCount++;
-				// Collection onChange is not recursive: listen directly to the
-				// schema instance so movement and animation patches are applied.
 				this.monsterChangeSubscriptions.set(
 					monsterId,
 					callbacks.onChange(monster, () =>
@@ -422,8 +417,6 @@ export class MonsterRenderer {
 			if (this.dyingMonsterIds.has(monsterId))
 				this.startMonsterDeath(monsterId);
 		} catch (error) {
-			// A malformed or unsupported GLB remains playable through the existing
-			// skeletal renderer instead of making the monster disappear.
 			console.warn(
 				`VAT unavailable for monster '${monster.kind}', using fallback`,
 				error,
@@ -456,8 +449,6 @@ export class MonsterRenderer {
 					model = await this.assets.instantiate(
 						url,
 						`${monster.kind}_${monster.isElite ? 'elite' : 'normal'}`,
-						// Keep every monster's mesh object independent. The hit material is
-						// swapped on those mesh pointers for a strictly local flash.
 						{ doNotInstantiate: true },
 					);
 					staticPoses = this.prepareModelInstance(model);

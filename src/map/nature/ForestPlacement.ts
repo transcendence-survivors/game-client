@@ -31,7 +31,6 @@ export type ForestPlacementKind = (typeof FOREST_PLACEMENT_KINDS)[number];
 export interface ForestPlacement extends Vec2d {
 	kind: ForestPlacementKind;
 	biome: ForestBiome;
-	/** Surface metadata is generated once and reused by the static renderer. */
 	y: number;
 	normalX: number;
 	normalY: number;
@@ -41,11 +40,6 @@ export interface ForestPlacement extends Vec2d {
 	variant: number;
 }
 
-/**
- * Packed forest output kept alive until the renderer has consumed it. The
- * worker writes this layout directly, so the main thread does not need to
- * allocate one object per decoration while a chunk is published.
- */
 export interface ForestPlacementBuffer {
 	readonly data: Float64Array;
 	readonly count: number;
@@ -130,10 +124,6 @@ const MIN_PLACEMENTS_PER_CHUNK = 70;
 const MAX_PLACEMENTS_PER_CHUNK = 80;
 const FILL_ATTEMPTS = 6400;
 
-// Keep the authored density in the requested 70–80 placements/chunk range.
-// The biome filters below intentionally remove some categories on paths,
-// steep slopes and plateaus, so the rule budget is slightly wider than the
-// final visual count.
 const RULES: readonly PlacementRule[] = [
 	{
 		kind: 'tree',
@@ -238,7 +228,6 @@ function randomBetween(random: RandomSource, min: number, max: number): number {
 	return min + (max - min) * random.next();
 }
 
-/** Samples broad, continuous scenery zones so adjacent chunks agree. */
 function terrainFields(
 	world: World,
 	x: number,
@@ -295,8 +284,6 @@ function isValidGround(
 	const gz = Math.floor(z / world.CELL);
 	const tier = world.tier(gx, gz);
 
-	// Keep the highest plateau readable: tall props stay out, while grass can
-	// still cover the ground so a rocky biome never turns into an empty void.
 	if (
 		tier >= world.TIERS - 1 &&
 		(kind === 'tree' || kind === 'bush' || kind === 'flower')
@@ -319,8 +306,6 @@ function isValidGround(
 	)
 		return false;
 
-	// The same mask drives the ochre texture, so the generated paths stay
-	// walkable and legible instead of being buried under large props.
 	if (kind === 'tree' && fields.path > 0.12) return false;
 	if (kind === 'bush' && fields.path > 0.22) return false;
 	if (kind === 'rock' && fields.path > 0.28) return false;
@@ -350,8 +335,6 @@ function placementProbability(
 							fields.meadow * 0.28 +
 							fields.grove * 0.12 -
 							fields.rocky * 0.2;
-	// The patch field creates coherent bouquets and clearings rather than
-	// scattering every item independently with white noise.
 	return clamp01(zoneWeight * (0.72 + patch * 0.48));
 }
 
@@ -427,16 +410,10 @@ class PlacementGrid {
 	}
 }
 
-/** Packs two signed placement-cell coordinates without string allocation. */
 function placementCellKey(cellX: number, cellZ: number): number {
 	return (cellX + 0x800000) * 0x1000000 + (cellZ + 0x800000);
 }
 
-/**
- * Keeps the generation working set packed while it is being built. The worker
- * can therefore write this same numeric layout directly into its transferable
- * or shared output buffer without creating one object per placement first.
- */
 class PackedForestPlacements {
 	readonly data: Float64Array;
 	length = 0;
@@ -510,7 +487,6 @@ class PackedForestPlacements {
 	}
 }
 
-/** Generates directly into the worker's packed output buffer. */
 export function generateForestPlacementsInto(
 	world: World,
 	chunkX: number,
@@ -645,11 +621,6 @@ function generateForestPlacementsInternal(
 		}
 	}
 	trimPlacementBudget(placements, placementGrid, targetCount);
-
-	// Biome/path rejection is intentional for the authored categories, but it
-	// must not turn an entire chunk into an empty green plateau. Fill the
-	// rejected budget with small biome-appropriate props, keeping the final
-	// deterministic count in the requested 70–80 range.
 	fillPlacementBudget(
 		world,
 		originX,
@@ -671,8 +642,6 @@ function trimPlacementBudget(
 	targetCount: number,
 ): void {
 	if (placements.length > targetCount) {
-		// Preserve the macro silhouette first; excess micro vegetation is the
-		// least visible part of a chunk and the safest deterministic trim.
 		for (const kind of REMOVABLE_PLACEMENT_KINDS) {
 			for (
 				let index = placements.length - 1;

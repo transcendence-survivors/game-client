@@ -3,7 +3,6 @@ interface FrameTimeSample {
 	valueMs: number;
 }
 
-/** Keeps a bounded, sliding average of per-frame timings. */
 export class FrameTimeHistory {
 	private samples: FrameTimeSample[] = [];
 	private head = 0;

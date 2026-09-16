@@ -74,9 +74,7 @@ export class GameI18n {
 			if (typeof window === 'undefined') return;
 			const storedLocale = window.localStorage.getItem(STORAGE_KEY);
 			if (isGameLocale(storedLocale)) this.locale = storedLocale;
-		} catch {
-			// Storage can be unavailable in privacy-restricted browser contexts.
-		}
+		} catch {}
 	}
 
 	private persist(locale: GameLocale): void {
@@ -84,9 +82,7 @@ export class GameI18n {
 			if (typeof window !== 'undefined') {
 				window.localStorage.setItem(STORAGE_KEY, locale);
 			}
-		} catch {
-			// The in-memory preference remains usable when persistence is blocked.
-		}
+		} catch {}
 	}
 }
 

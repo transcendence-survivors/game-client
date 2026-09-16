@@ -1,4 +1,3 @@
-/** Smooth Hermite interpolation shared by deterministic world generators. */
 export function smoothstep(
 	edge0: number,
 	edge1: number,
@@ -8,7 +7,6 @@ export function smoothstep(
 	return t * t * (3 - 2 * t);
 }
 
-/** Deterministic two-dimensional integer-coordinate hash in the [0, 1) range. */
 export function hash2(x: number, z: number, seed: number): number {
 	let value =
 		(seed >>> 0) ^
@@ -19,7 +17,6 @@ export function hash2(x: number, z: number, seed: number): number {
 	return ((value ^ (value >>> 13)) >>> 0) / 4294967296;
 }
 
-/** Deterministic smooth value noise in the [-1, 1) range. */
 export function valueNoise2d(x: number, z: number, seed: number): number {
 	const x0 = Math.floor(x);
 	const z0 = Math.floor(z);
@@ -34,7 +31,6 @@ export function valueNoise2d(x: number, z: number, seed: number): number {
 	return (ab + (cd - ab) * tz) * 2 - 1;
 }
 
-/** Four-octave deterministic fractional Brownian motion. */
 export function fbm2d(x: number, z: number, seed: number): number {
 	let value = 0;
 	let amplitude = 0.5;

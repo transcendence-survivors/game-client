@@ -6,16 +6,11 @@ import {
 	DEPTH_UNIFORMS,
 } from './SceneDepthTexture';
 
-// The lighting passes affect the complete image. Rendering them at 45% made
-// the scene visibly blurry/blocky after the final upscale, so the default
-// profile keeps native resolution and relies on the reduced shader step count
-// for the performance saving.
 export const EFFECT_RENDER_RATIO = 1;
 
 export interface RadialLightingOptions {
 	innerRadius: number;
 	outerRadius: number;
-	/** Visibility floor outside the outer radius; zero makes the boundary opaque. */
 	penumbra: number;
 	lightColor: Color3;
 }

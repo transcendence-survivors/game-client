@@ -1,16 +1,8 @@
 import { MAX_DT } from '@transcendence/game-shared';
 
-/** Movement packets are intentionally independent from the render cadence. */
 export const NETWORK_MOVE_INTERVAL_S = 1 / 30;
 export const NETWORK_HEARTBEAT_INTERVAL_S = 1 / 5;
 
-/**
- * Accumulates render time and tells the client when a movement packet is due.
- *
- * The accumulator keeps the excess time after a send, so a short frame does
- * not change the long-term packet rate. A direction transition is sent right
- * away: this prevents a quick key tap from being swallowed between two ticks.
- */
 export class NetworkInputCadence {
 	private elapsedS = 0;
 	private previousStateDeltaTimeS = 0;
@@ -39,8 +31,6 @@ export class NetworkInputCadence {
 
 		this.started = true;
 		this.lastMoving = moving;
-		// A new input state must not be applied retroactively to time accumulated
-		// under the previous state (especially an edge-triggered jump).
 		const changesInputState = transitioned || force;
 		if (changesInputState)
 			this.previousStateDeltaTimeS = Math.min(

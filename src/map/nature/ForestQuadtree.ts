@@ -38,7 +38,6 @@ interface ForestQuadtreeNode<T> {
 const DEFAULT_NODE_CAPACITY = 8;
 const DEFAULT_MAX_DEPTH = 12;
 
-/** Spatial index for ground scenery chunks; Y is kept only for frustum tests. */
 export class ForestQuadtree<T> {
 	private readonly initialSize: number;
 	private readonly nodeCapacity: number;
@@ -72,7 +71,6 @@ export class ForestQuadtree<T> {
 			this.insertIntoNode(this.root, entry, 0);
 	}
 
-	/** Removes a chunk without walking the whole tree on every stream step. */
 	remove(key: string): void {
 		const entry = this.entries.get(key);
 		if (!entry) return;
@@ -80,8 +78,6 @@ export class ForestQuadtree<T> {
 		this.entries.delete(key);
 		this.staleEntryCount++;
 
-		// Removed entries are tombstoned so removal stays cheap. Rebuild once
-		// tombstones become a meaningful part of the index, keeping queries fast.
 		if (
 			this.entries.size === 0 ||
 			(this.staleEntryCount >= this.nodeCapacity * 2 &&
@@ -156,15 +152,23 @@ export class ForestQuadtree<T> {
 		const size = current.maxX - current.minX;
 		return {
 			minX:
-				content.minX < current.minX ? current.minX - size : current.minX,
+				content.minX < current.minX
+					? current.minX - size
+					: current.minX,
 			maxX:
-				content.maxX > current.maxX ? current.maxX + size : current.maxX,
+				content.maxX > current.maxX
+					? current.maxX + size
+					: current.maxX,
 			minY: current.minY,
 			maxY: current.maxY,
 			minZ:
-				content.minZ < current.minZ ? current.minZ - size : current.minZ,
+				content.minZ < current.minZ
+					? current.minZ - size
+					: current.minZ,
 			maxZ:
-				content.maxZ > current.maxZ ? current.maxZ + size : current.maxZ,
+				content.maxZ > current.maxZ
+					? current.maxZ + size
+					: current.maxZ,
 		};
 	}
 
@@ -258,7 +262,13 @@ export class ForestQuadtree<T> {
 			const x = plane.normal.x >= 0 ? bounds.maxX : bounds.minX;
 			const y = plane.normal.y >= 0 ? bounds.maxY : bounds.minY;
 			const z = plane.normal.z >= 0 ? bounds.maxZ : bounds.minZ;
-			if (plane.normal.x * x + plane.normal.y * y + plane.normal.z * z + plane.d < 0)
+			if (
+				plane.normal.x * x +
+					plane.normal.y * y +
+					plane.normal.z * z +
+					plane.d <
+				0
+			)
 				return true;
 		}
 		return false;

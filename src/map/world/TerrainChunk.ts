@@ -86,7 +86,6 @@ function getStaticTerrainGrid(
 			const b = a + 1;
 			const d = a + row;
 			const c = d + 1;
-			// Counter-clockwise when viewed from above.
 			indices[offset++] = a;
 			indices[offset++] = d;
 			indices[offset++] = b;
@@ -100,7 +99,6 @@ function getStaticTerrainGrid(
 	return grid;
 }
 
-/** Builds a shared, continuously sampled terrain surface for one chunk. */
 export function buildChunkMesh(
 	scene: Scene,
 	world: World,
@@ -159,12 +157,10 @@ export function buildChunkMesh(
 		vd.uvs = uvs;
 		vd.applyToMesh(mesh);
 		mesh.onDisposeObservable.addOnce(releaseBuffers);
-		// Render the upper side from above with Babylon's normal front-face winding.
 		mesh.sideOrientation = Mesh.FRONTSIDE;
 		mesh.position.set(originX, 0, originZ);
 		mesh.material = mat;
 		mesh.isPickable = false;
-		// Keep the translated bounding box for frustum culling before freezing it.
 		mesh.freezeWorldMatrix();
 		return mesh;
 	} catch (error) {

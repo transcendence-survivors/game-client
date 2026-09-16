@@ -143,11 +143,6 @@ function bakeMeshAnimation(
 	return { mesh, manager };
 }
 
-/**
- * Renders ordinary and elite monsters as one VAT/thin-instance batch per GLB.
- * Bosses deliberately remain in MonsterView so their detailed skeletons and
- * bespoke presentation are unchanged.
- */
 export class BakedMonsterRenderer {
 	private readonly monsters = new Map<string, BakedMonster>();
 	private readonly batches = new Map<string, Promise<BakedBatch>>();

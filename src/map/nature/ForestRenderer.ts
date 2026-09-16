@@ -131,14 +131,6 @@ function capSupportPoints(
 	return selected;
 }
 
-/**
- * Streams deterministic Stylized Nature MegaKit scenery around the local player.
- *
- * Nature is presentation-only: terrain and gameplay remain authoritative on
- * the server, while this renderer independently derives the same decoration
- * from the replicated world seed. Chunks are loaded asynchronously and retained
- * through a hysteresis ring so nearby scenery is not repeatedly recreated.
- */
 export class ForestRenderer {
 	private readonly scene: BABYLON.Scene;
 	private readonly map: MapGenerator;
@@ -239,7 +231,6 @@ export class ForestRenderer {
 		);
 	}
 
-	/** Updates the streamed nature ring around a world position. */
 	update(position: BABYLON.Vector3): void {
 		if (this.disposed) return;
 		const cx = Math.floor(position.x / this.chunkSize);
@@ -254,7 +245,6 @@ export class ForestRenderer {
 		this.updateVisibility();
 	}
 
-	/** Releases instantiated scenery and invalidates in-flight loads. */
 	dispose(): void {
 		if (this.disposed) return;
 		this.disposed = true;
@@ -326,8 +316,6 @@ export class ForestRenderer {
 						: 0;
 			if (Math.max(distanceX, distanceZ) <= retention) continue;
 
-			// A pending generation can finish after eviction. Removing its token
-			// from the map makes isCurrent() reject that result safely.
 			for (const [chunkKey, chunk] of this.chunks) {
 				if (chunk.page !== page) continue;
 				chunk.root.dispose();
@@ -528,8 +516,6 @@ export class ForestRenderer {
 					this.chunkBounds(loadedChunk.x, loadedChunk.z),
 					loadedChunk,
 				);
-				// A pending chunk is treated as visible until it becomes indexed. The
-				// exact chunk visibility is applied on the next visibility update.
 				this.visibilityVersion++;
 				this.visibilityDirty = true;
 			} finally {
@@ -577,13 +563,6 @@ export class ForestRenderer {
 		return performance.now();
 	}
 
-	/**
-	 * Adds one static GLB to the current render page. A URL gets one source
-	 * mesh per render mesh and every placement contributes one world matrix to
-	 * the shared page buffer. The chunk key is retained beside each matrix so
-	 * strict chunk visibility can compact the GPU prefix without breaking the
-	 * batching.
-	 */
 	private attachPackedThinInstanceBatch(
 		chunk: PendingForestChunk,
 		model: BABYLON.AbstractMesh | null,
@@ -631,9 +610,6 @@ export class ForestRenderer {
 			);
 			batch = {
 				sourceMeshes,
-				// Reserve the protocol maximum for every chunk in the page. Most
-				// pages never grow after this first upload, so stream publication
-				// only writes into an existing GPU allocation.
 				matrixData: new Float32Array(
 					FOREST_PAGE_INITIAL_INSTANCE_CAPACITY * 16,
 				),
@@ -648,9 +624,6 @@ export class ForestRenderer {
 			};
 			page.thinBatches.set(url, batch);
 		} else {
-			// The same URL must expose the same render-mesh layout. If an asset
-			// loader ever violates that assumption, keep this occurrence on the
-			// safe non-instanced path instead of pairing the wrong meshes.
 			if (model) {
 				const sourceMeshes = this.getThinInstanceSources(model);
 				if (
@@ -694,8 +667,6 @@ export class ForestRenderer {
 				readPlacement(index),
 				metadata,
 			);
-			// Each source mesh has its original hierarchy transform baked into
-			// its vertices, so all sources share the same world placement matrix.
 			placementMatrix.copyToArray(
 				matrixData,
 				(firstMatrixIndex + index) * 16,
@@ -703,8 +674,6 @@ export class ForestRenderer {
 			batch.instanceChunkKeys.push(chunkVisibilityKey);
 		}
 		batch.instanceCount = nextInstanceCount;
-		// A new slice invalidates the compact visible prefix. Rebuild it once;
-		// visibility changes elsewhere use the same allocation-free path.
 		batch.lastVisibilityVersion = -1;
 		this.refreshThinInstanceBatch(batch);
 		return true;
@@ -714,8 +683,6 @@ export class ForestRenderer {
 		key?: string;
 		root: BABYLON.TransformNode;
 	}): string {
-		// Test-only synthetic chunks do not have a stream key. Treating them as
-		// visible keeps the batching helper usable before the chunk is published.
 		return chunk.key ?? chunk.root.name;
 	}
 
@@ -753,8 +720,6 @@ export class ForestRenderer {
 					false,
 				);
 			} else if (visibleInstanceCount > 0) {
-				// Update only the visible prefix. The thin instance count hides any
-				// stale tail when the camera removes chunks from the set.
 				sourceMesh.thinInstancePartialBufferUpdate(
 					'matrix',
 					batch.visibleMatrixData.subarray(
@@ -777,11 +742,6 @@ export class ForestRenderer {
 					this.refreshThinInstanceBatch(batch);
 	}
 
-	/**
-	 * Normalizes the first imported hierarchy into a reusable global source.
-	 * Child transforms are baked once; subsequent chunks reuse these meshes and
-	 * only append matrices to the shared batch.
-	 */
 	private prepareThinInstanceSource(
 		model: BABYLON.AbstractMesh,
 		sourceMeshes: BABYLON.Mesh[],
@@ -807,14 +767,10 @@ export class ForestRenderer {
 			mesh.position.set(0, 0, 0);
 			mesh.scaling.setAll(1);
 			mesh.computeWorldMatrix(true);
-			// Static source setup is paid once when the reusable source is created,
-			// never again for each streamed placement slice.
 			this.prepareStaticNatureMesh(mesh);
 		}
 		this.updateHierarchyMatrices(model);
 
-		// A GLB may have a transform-only root. Once all render meshes have been
-		// detached, that unused root must not remain in the global scene graph.
 		if (!sourceMeshes.some((mesh) => mesh === model)) model.dispose();
 		return metadata;
 	}
@@ -907,8 +863,6 @@ export class ForestRenderer {
 			this.placementMatrix,
 		);
 
-		// Large assets can span more than one terrain triangle. Use the support
-		// footprint to fit a single rigid slope before uploading the matrix.
 		for (let iteration = 0; iteration < 2; iteration++) {
 			const fittedNormal = this.fitSupportNormal(
 				this.transformSupportPointsToScratch(matrix, metadata.points),
@@ -930,9 +884,6 @@ export class ForestRenderer {
 			);
 		}
 
-		// A rigid matrix cannot bend a large base over a curved surface. Move the
-		// whole instance down until at least one support point touches the ground
-		// and no support point is left visibly floating.
 		this.preventSupportFloating(matrix, metadata.points);
 		return matrix;
 	}
@@ -1051,10 +1002,6 @@ export class ForestRenderer {
 		this.updateHierarchyMatrices(model);
 		this.anchorSupport(model, metadata.center, placement.x, placement.z);
 
-		// A normal sampled at one point is exact for the terrain triangle below
-		// that point, but a large tree can cover several triangles. Fit the normal
-		// to the complete support footprint so the trunk follows the local slope
-		// instead of pivoting around one vertex.
 		for (let iteration = 0; iteration < 2; iteration++) {
 			const supportPoints = this.worldSupportPoints(
 				model,
@@ -1088,12 +1035,6 @@ export class ForestRenderer {
 		for (const mesh of meshes) this.prepareStaticNatureMesh(mesh);
 	}
 
-	/**
-	 * Culls complete loaded chunks. Page roots remain allocated for batching,
-	 * while each thin-instance batch is compacted to the matrices belonging to
-	 * the visible chunk set. This keeps the page-level draw-call reduction
-	 * without making a whole page visible because of one distant chunk.
-	 */
 	private updateVisibility(): void {
 		const camera = this.scene.activeCamera;
 		if (!camera || this.pages.size === 0) return;
@@ -1145,8 +1086,6 @@ export class ForestRenderer {
 				chunk.visible = visible;
 				chunkVisibilityChanged = true;
 			}
-			// Fallback meshes are children of the chunk root. Thin-instance
-			// sources are controlled below through their compact matrix prefix.
 			chunk.root.setEnabled(visible);
 		}
 		for (const page of this.pages.values()) {
@@ -1188,20 +1127,12 @@ export class ForestRenderer {
 	private prepareStaticNatureMesh(mesh: BABYLON.AbstractMesh): void {
 		mesh.isPickable = false;
 		mesh.checkCollisions = false;
-		// ForestRenderer applies strict chunk visibility. Keep each source active
-		// inside its enabled page so Babylon cannot apply a second, incomplete
-		// thin-instance bounding-box test while the camera moves near an instance.
 		mesh.alwaysSelectAsActiveMesh = true;
 		if (mesh instanceof BABYLON.Mesh)
 			mesh.thinInstanceEnablePicking = false;
 		mesh.freezeWorldMatrix();
 	}
 
-	/**
-	 * Returns a stable, local support description for one GLB URL. GLB origins
-	 * are not part of the contract, so the lower band of actual geometry is used
-	 * instead of a category-specific Y offset or the hierarchy origin.
-	 */
 	private getSupportMetadata(
 		url: string,
 		root: BABYLON.AbstractMesh,
@@ -1301,9 +1232,6 @@ export class ForestRenderer {
 			0,
 			Math.cos(rotationY),
 		);
-		// Preserve the authored yaw while projecting the forward axis onto the
-		// terrain tangent plane. This makes the entire support band follow the
-		// hillside instead of leaving the trunk vertical in world space.
 		const projection = BABYLON.Vector3.Dot(forward, up);
 		forward.x -= up.x * projection;
 		forward.y -= up.y * projection;
@@ -1402,13 +1330,6 @@ export class ForestRenderer {
 		return result.lengthSquared() < 0.000001 ? null : result.normalize();
 	}
 
-	/**
-	 * Conforms only the geometry that belongs to the support band to the real
-	 * terrain. Lifting every vertex is incorrect for wide canopies and branches:
-	 * an overhang over an uphill triangle must not raise the trunk off the soil.
-	 * The lower vertices are made unique per occurrence before being adjusted so
-	 * one tree never changes the geometry of another instance of the same GLB.
-	 */
 	private conformBaseToTerrain(
 		root: BABYLON.AbstractMesh,
 		metadata: SupportMetadata,

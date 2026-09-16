@@ -8,7 +8,6 @@ export interface AuraInstance extends Vec2d {
 	attackSpeed: number;
 }
 
-// Injection cosmétique par pixel, sans mesh ni z-fighting sur le relief.
 export class PlayerAuraPlugin extends BABYLON.MaterialPluginBase {
 	private _enabled = true;
 	private readonly _auraData = new Float32Array(MAX_AURAS * 4);

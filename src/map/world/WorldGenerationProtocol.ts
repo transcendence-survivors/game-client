@@ -5,11 +5,9 @@ export const GENERATION_STATUS_INDEX = 0;
 export const GENERATION_COUNT_INDEX = 1;
 export const GENERATION_READY = 1;
 
-/** Packed forest fields: kind, biome, x, z, y, nx, ny, nz, rotation, scale, variant. */
 export const FOREST_PLACEMENT_STRIDE = 11;
 export const FOREST_PLACEMENT_CAPACITY = 128;
 
-/** Packed terrain fields: all heights, followed by all xyz normals. */
 export const TERRAIN_SURFACE_STRIDE = 4;
 
 type GenerationTaskBase = ChunkCoordinates & {

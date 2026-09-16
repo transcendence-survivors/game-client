@@ -77,11 +77,6 @@ function deferToTask<T>(work: () => T): Promise<T> {
 	});
 }
 
-/**
- * Runs deterministic world generation away from the render callback. Shared
- * buffers carry the numeric payload without a structured-clone copy when the
- * page is cross-origin isolated; unsupported pages use a transferable buffer.
- */
 export class WorldGenerationClient {
 	private worker: Worker | null = null;
 	private nextTaskId = 1;
@@ -98,10 +93,6 @@ export class WorldGenerationClient {
 		}
 	}
 
-	/**
-	 * Returns the worker payload without decoding it into one object per
-	 * placement. The caller owns the buffer until release() is called.
-	 */
 	generateForestPacked(
 		world: World,
 		chunkX: number,

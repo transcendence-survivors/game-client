@@ -32,7 +32,6 @@ const BODY_SHOW_MARGIN = 1.6;
 
 const ATTACK_EXIT_DELAY_S = 0.35;
 
-/** Monster animation sampling is independent from the render cadence. */
 export const MONSTER_ANIMATION_INTERVAL_S = 1 / 30;
 
 const MONSTER_CAMERA_OCCLUSION_HZ = 15;
@@ -43,7 +42,6 @@ export function normalizeAnimationName(name: string): string {
 	return name.split(/[_:]/).pop()!.toLowerCase();
 }
 
-/** Maps asset-specific clip names to the gameplay animation states. */
 export function semanticAnimationName(name: string): string {
 	const normalized = normalizeAnimationName(name);
 	const lowerName = name.toLowerCase();
@@ -241,7 +239,6 @@ export class MonsterView {
 		this.target.rotationY = rotationY;
 	}
 
-	/** Returns true when the renderer should refresh this monster's terrain height. */
 	shouldRefreshGroundHeight(deltaTime: number): boolean {
 		if (!Number.isFinite(deltaTime) || deltaTime <= 0) return false;
 		this.groundHeightAccumulatorS += Math.min(deltaTime, 0.25);
@@ -258,7 +255,6 @@ export class MonsterView {
 		if (Number.isFinite(height)) this.groundHeight = height;
 	}
 
-	/** Enables the hierarchy only when the monster can contribute to the view. */
 	setRenderEnabled(enabled: boolean): void {
 		if (this.renderEnabled === enabled) return;
 		this.renderEnabled = enabled;
@@ -267,8 +263,6 @@ export class MonsterView {
 		this.root.position.x = this.target.x;
 		this.root.position.z = this.target.z;
 		this.root.rotation.y = this.target.rotationY + MONSTER_MODEL_YAW_OFFSET;
-		// Catch up immediately after an off-screen interval without making the
-		// first visible frame wait for the next cadence boundary.
 		this.groundHeightAccumulatorS = MONSTER_GROUND_HEIGHT_INTERVAL_S;
 		this.animationSampleAccumulatorS = MONSTER_ANIMATION_INTERVAL_S;
 		this.cameraOcclusionAccumulatorS = MONSTER_CAMERA_OCCLUSION_INTERVAL_S;
@@ -352,8 +346,6 @@ export class MonsterView {
 			this.posedHitboxParts,
 			this.modelSizeMultiplier,
 		);
-		// Le modèle porte déjà MONSTER_MODEL_YAW_OFFSET; annule ce demi-tour pour
-		// replacer les volumes calculés dans le repère d'origine du GLB.
 		const angle = this.root.rotation.y + Math.PI;
 		const sin = Math.sin(angle);
 		const cos = Math.cos(angle);
@@ -371,9 +363,6 @@ export class MonsterView {
 		if (this.deathStarted) return;
 		this.damageFlashRemainingS = MONSTER_DAMAGE_FLASH_DURATION_S;
 		for (const mesh of this.getMeshes()) {
-			// Replace the material pointer on this monster's meshes only. The
-			// original GLB materials stay shared and immutable, so no material or
-			// shader state can leak to another monster of the same kind.
 			if (!this.damageFlashOriginalMaterials.has(mesh))
 				this.damageFlashOriginalMaterials.set(mesh, mesh.material);
 			mesh.material = this.damageFlashMaterial;
@@ -399,7 +388,6 @@ export class MonsterView {
 		this.damageFlashOriginalMaterials.clear();
 	}
 
-	/** Starts the non-looping Death clip and returns its duration. */
 	startDeath(): number {
 		if (this.deathStarted) return this.deathDurationS;
 		this.deathStarted = true;
@@ -465,8 +453,6 @@ export class MonsterView {
 	): void {
 		const group = this.animations.get(animation);
 		if (!group) return;
-		// Keep one paused animatable set per monster. Babylon can seek it on
-		// demand, but skips curve evaluation between samples in the render loop.
 		if (!group.isStarted) {
 			group.play(loop);
 			group.pause();
@@ -593,7 +579,6 @@ export class MonsterView {
 		}
 	}
 
-	/** Advances only logical timers while the hierarchy is culled. */
 	updateOffscreen(deltaTime: number): void {
 		this.animationStateAgeS += Math.max(0, deltaTime);
 		if (this.damageFlashRemainingS > 0) {

@@ -7,19 +7,13 @@ import {
 } from './GroundFeatures';
 import { fbm2d, smoothstep } from './ProceduralNoise';
 
-/** Texture resolution in pixels. */
 const GROUND_TEXTURE_SIZE = 512;
-/** World-space size covered before the texture repeats. */
 export const GROUND_TEXTURE_WORLD_SIZE = 1024;
 
 function channel(value: number): number {
 	return Math.max(0, Math.min(255, Math.round(value)));
 }
 
-/**
- * Makes the grass and ochre cracked path in CPU memory so it works without a
- * canvas or an external image asset. Coordinates are centred on world origin.
- */
 export function createProceduralGroundTextureData(seed: number): Uint8Array {
 	const size = GROUND_TEXTURE_SIZE;
 	const worldScale = GROUND_TEXTURE_WORLD_SIZE / size;

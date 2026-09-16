@@ -30,11 +30,6 @@ export function createGroundPathParameters(seed: number): GroundPathParameters {
 	};
 }
 
-/**
- * Broad biome weights shared by the ground palette and the decoration pass.
- * The low frequency keeps a biome readable for several chunks before a soft
- * transition, while a second field gives rocky highlands their own identity.
- */
 export function groundBiomeWeights(
 	x: number,
 	z: number,
@@ -60,9 +55,6 @@ export function groundBiomeWeights(
 			(1 - smoothstep(0.66, 0.84, elevation) * 0.55) *
 			0.95 +
 		(1 - elevation) * 0.12;
-	// Sharpen the normalized weights so neighboring chunks transition softly,
-	// but a dominant biome still reads as a real region instead of a uniform
-	// average of all three palettes.
 	const sharpMeadow = sharpenBiomeScore(meadowScore);
 	const sharpForest = sharpenBiomeScore(forestScore);
 	const sharpRocky = sharpenBiomeScore(rockyScore);
@@ -73,11 +65,6 @@ export function groundBiomeWeights(
 	return result;
 }
 
-/**
- * Shared deterministic path mask used by both the ground texture and scenery.
- * Keeping the field in one pure module makes visual paths and clearings agree
- * at chunk boundaries without putting decorative data in the game state.
- */
 export function groundPathFactor(
 	x: number,
 	z: number,

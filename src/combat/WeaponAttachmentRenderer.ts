@@ -198,9 +198,6 @@ export class WeaponAttachmentRenderer {
 		}
 		let root = modelRoot;
 		if (weapon === 'sword') {
-			// Le GLB place la longueur de l'epee sur Y. Le modele est couche sur le
-			// plan XZ et decale jusqu'a ce que son pommeau coincide avec le pivot.
-			// Seul ce pivot tourne pendant l'attaque : sa position ne bouge jamais.
 			root = new BABYLON.TransformNode(
 				`swordPivot:${playerId}`,
 				modelRoot.getScene(),
@@ -208,12 +205,8 @@ export class WeaponAttachmentRenderer {
 			modelRoot.parent = root;
 			modelRoot.rotationQuaternion = null;
 			modelRoot.position.set(0, 0, SWORD_POMMEL_OFFSET);
-			// Le modele charge pointe sur Y ; +PI/2 couche la lame vers +Z, qui est
-			// exactement l'avant utilise par les mouvements et les degats serveur.
 			modelRoot.rotation.set(Math.PI / 2, 0, 0);
 		} else if (weapon === 'bow') {
-			// Le GLB vit dans le plan XY. Cette double rotation le place dans XZ :
-			// ses branches restent gauche/droite et sa courbure pointe vers +Z.
 			root = new BABYLON.TransformNode(
 				`bowPivot:${playerId}`,
 				modelRoot.getScene(),

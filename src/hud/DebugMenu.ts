@@ -384,9 +384,6 @@ export class DebugMenu {
 	private recordFrameTimes(): void {
 		if (!this.panelVisible) return;
 		const now = performance.now();
-		// SceneInstrumentation resets the engine draw-call counter at the start
-		// of the next Babylon render cycle. Keep the completed frame's value so
-		// the game-loop observer does not read the freshly reset counter.
 		if (this.instrumentation)
 			this.lastDrawCalls = this.instrumentation.drawCallsCounter.current;
 

@@ -28,7 +28,6 @@ const TRANSFORM_PROPERTIES = new Set<TransformProperty>([
 	'scaling',
 ]);
 
-/** Highest sampling rate declared by any track in an animation group. */
 export function animationFramesPerSecond(
 	group: BABYLON.AnimationGroup,
 ): number {

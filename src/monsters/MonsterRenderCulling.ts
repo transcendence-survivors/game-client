@@ -10,15 +10,9 @@ export const MONSTER_RENDER_CULLING_CONFIG = {
 	enabled: true,
 	margin: 5,
 	fovMarginRadians: 0.18,
-	/** Let the underused GPU render the conservative envelope directly. */
 	forceActiveMeshes: true,
 } as const;
 
-/**
- * Conservative horizontal frustum test used before touching a monster's
- * Babylon hierarchy. The margin keeps large models and screen-edge monsters
- * visible; Babylon still performs the final mesh-level culling.
- */
 export function isMonsterInCameraEnvelope(
 	x: number,
 	z: number,

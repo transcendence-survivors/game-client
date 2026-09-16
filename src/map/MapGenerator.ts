@@ -90,8 +90,6 @@ export class MapGenerator {
 		this.radialLighting = new RadialLightingPostProcess(this.scene, {
 			innerRadius: this.ZONE_RADIUS * 0.45,
 			outerRadius: this.ZONE_RADIUS,
-			// The first cylinder is the hard visibility boundary. The radial
-			// curve must reach full opacity exactly at its radius.
 			penumbra: 0,
 			lightColor: beamColor,
 		});
@@ -138,7 +136,6 @@ export class MapGenerator {
 		return this.world;
 	}
 
-	/** Center shared by the access cylinder and chunk visibility distance. */
 	getZoneCenter(): BABYLON.Vector3 {
 		return this.rayPos;
 	}

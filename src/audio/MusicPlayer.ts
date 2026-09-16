@@ -21,7 +21,6 @@ type AudioFactory = () => AudioPlayback;
 
 const AUTOPLAY_UNLOCK_EVENTS = ['pointerdown', 'keydown'] as const;
 
-/** Owns one music channel and cycles through its playlist indefinitely. */
 export class MusicPlayer {
 	private readonly tracks: readonly MusicTrack[];
 	private readonly audio: AudioPlayback;
@@ -67,7 +66,6 @@ export class MusicPlayer {
 		if (!track) return;
 		this.audio.src = track.src;
 		this.audio.volume = Math.min(1, Math.max(0, track.volume ?? 1));
-		// Native looping is gapless. With several tracks, `ended` advances the list.
 		this.audio.loop = this.tracks.length === 1;
 		this.audio.load();
 	}
@@ -78,7 +76,6 @@ export class MusicPlayer {
 			await this.audio.play();
 			this.removeUnlockListeners();
 		} catch {
-			// Browsers can reject autoplay until the first user gesture.
 			this.addUnlockListeners();
 		}
 	}
