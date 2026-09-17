@@ -8,6 +8,7 @@ import type { PlayerStats } from '../../../shared-package/src/schemas/GameState'
 import { iconsImport } from '../assets/icons';
 import { gameI18n, type TranslationKey } from '../i18n';
 import { setText } from '../i18n/gui';
+import { formatGameTime } from '../hud/HudFormatting';
 
 interface StatDef {
 	key: keyof PlayerStats;
@@ -157,6 +158,14 @@ export class EndingScreen {
 				def.format ? def.format(rawValue) : rawValue
 			}`;
 		});
+
+		const kills = this.advTex.getControlByName('Kills') as GUI.TextBlock;
+		if (!kills) return;
+		kills.text = `${gameI18n.t('stats.kills')}: ${stats.killAmount}`;
+
+		const time = this.advTex.getControlByName('Time') as GUI.TextBlock;
+		if (!time) return;
+		time.text = `${gameI18n.t('hud.survivalTime')}: ${formatGameTime(this.room.state.combatTimeS)}`;
 	}
 
 	private connectButton() {

@@ -5,7 +5,7 @@ export const GAME_MUSIC_TRACKS: readonly MusicTrack[] = [
 		id: 'cursed-crown-run',
 		src: new URL('../assets/music/cursed-crown-run.wav', import.meta.url)
 			.href,
-		volume: 0.4,
+		volume: 0.1,
 	},
 ];
 
