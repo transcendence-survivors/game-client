@@ -1,15 +1,17 @@
 import type { Scene } from '@babylonjs/core';
 import * as GUI from '@babylonjs/gui';
 import { createFullscreenUi } from '../assets/ui';
-import type { Room } from '@colyseus/sdk';
+import * as COLYSEUS from '@colyseus/sdk';
 import {
 	ClientMessage,
 	ServerMessage,
 	UPGRADE_CHOICE_COUNT,
+	type GameState,
 	type UpgradeOption,
 } from '@transcendence/game-shared';
 import { iconsImport } from '../assets/icons';
 import { CleanupBag } from '../CleanupBag';
+import { UpgradeQueue } from './UpgradeQueue';
 import { HUD_THEME } from '../hud/HudTheme';
 import { guiImports } from '../assets/ui';
 import {
@@ -45,14 +47,13 @@ export class LevelUpMenu {
 	private advTex!: GUI.AdvancedDynamicTexture;
 	private levelUpRootContainer!: GUI.Rectangle;
 	private currentOptions: readonly UpgradeOption[] = [];
-	private pendingLevels = 0;
-	private awaitingOptions = false;
-	private readonly room: Room;
+	private readonly queue = new UpgradeQueue();
+	private readonly room: COLYSEUS.Room<GameState>;
 	private cards: UpgradeCardControls[] = [];
 	private readonly subscriptions = new CleanupBag();
 	private disposed = false;
 
-	constructor(scene: Scene, room: Room) {
+	constructor(scene: Scene, room: COLYSEUS.Room<GameState>) {
 		this.room = room;
 		this.init(scene);
 	}
@@ -123,6 +124,10 @@ export class LevelUpMenu {
 		};
 	}
 
+	isOpen(): boolean {
+		return this.levelUpRootContainer?.isVisible === true;
+	}
+
 	dispose(): void {
 		if (this.disposed) return;
 		this.disposed = true;
@@ -170,14 +175,15 @@ export class LevelUpMenu {
 		});
 	}
 
-	private requestNextOptions(): void {
-		if (this.pendingLevels <= 0) {
-			this.levelUpRootContainer.isVisible = false;
-			return;
-		}
-		if (this.awaitingOptions) return;
-		this.awaitingOptions = true;
+	private requestOptions(): void {
+		this.queue.markRequested();
 		this.room.send(ClientMessage.RequestUpgradeOptions);
+	}
+
+	private setDowned(downed: boolean): void {
+		const shouldRequest = this.queue.setDowned(downed);
+		if (downed) this.levelUpRootContainer.isVisible = false;
+		if (shouldRequest) this.requestOptions();
 	}
 
 	private linkControls(): void {
@@ -218,6 +224,18 @@ export class LevelUpMenu {
 		this.subscriptions.add(() =>
 			window.removeEventListener('keydown', keyDownHandler),
 		);
+		const callbacks = COLYSEUS.Callbacks.get(this.room);
+		this.subscriptions.add(
+			callbacks.onAdd('players', (player, sessionId) => {
+				if (sessionId !== this.room.sessionId) return;
+				this.setDowned(player.isDowned);
+				this.subscriptions.add(
+					callbacks.listen(player, 'isDowned', (isDowned) =>
+						this.setDowned(isDowned),
+					),
+				);
+			}),
+		);
 		this.subscriptions.add(
 			this.room.onMessage(ServerMessage.LevelUp, () => this.onLevelUp()),
 		);
@@ -225,10 +243,9 @@ export class LevelUpMenu {
 			this.room.onMessage(
 				ServerMessage.UpgradeOptions,
 				(options: readonly UpgradeOption[]) => {
-					this.awaitingOptions = false;
+					this.queue.receiveOptions(options.length);
 					this.currentOptions = options;
 					if (options.length === 0) {
-						this.pendingLevels = 0;
 						this.levelUpRootContainer.isVisible = false;
 						return;
 					}
@@ -240,11 +257,12 @@ export class LevelUpMenu {
 	}
 
 	private onLevelUp(): void {
-		this.pendingLevels++;
-		if (!this.levelUpRootContainer.isVisible) this.requestNextOptions();
+		if (this.queue.addLevel(this.levelUpRootContainer.isVisible))
+			this.requestOptions();
 	}
 
 	private selectUpgrade(index: number): void {
+		if (this.queue.isDowned()) return;
 		if (!this.levelUpRootContainer.isVisible) return;
 
 		const chosen = this.currentOptions[index];
@@ -252,8 +270,7 @@ export class LevelUpMenu {
 
 		this.room.send(ClientMessage.SelectUpgrade, { id: chosen.id });
 
-		this.pendingLevels--;
 		this.levelUpRootContainer.isVisible = false;
-		this.requestNextOptions();
+		if (this.queue.consumeLevel()) this.requestOptions();
 	}
 }

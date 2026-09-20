@@ -41,6 +41,8 @@ interface HudControls {
 	teamPanel: GUI.Rectangle;
 	teamCountText: GUI.TextBlock;
 	teammateSlots: TeammateSlotControls[];
+	downedPanel: GUI.Rectangle;
+	downedHint: GUI.TextBlock;
 }
 
 type StateCallbacks = ReturnType<typeof COLYSEUS.Callbacks.get<GameState>>;
@@ -83,6 +85,7 @@ export class Hud {
 	private readonly controls: HudControls;
 	private readonly teammateIds: string[] = [];
 	private activeBossId = '';
+	private reviveKeyLabel = '';
 	private teamDirty = true;
 	private weaponsDirty = true;
 	private bossDirty = true;
@@ -161,6 +164,7 @@ export class Hud {
 			callbacks.onChange(player.life, this.markPlayerDirty),
 			callbacks.onChange(player.experience, this.markPlayerDirty),
 			callbacks.listen(player.stats, 'killAmount', this.markPlayerDirty),
+			callbacks.listen(player, 'isDowned', this.markPlayerDirty),
 		);
 		const weaponSubscriptions = new CleanupRegistry<string>();
 		subscriptions.add(
@@ -188,6 +192,7 @@ export class Hud {
 		subscriptions.add(
 			callbacks.listen(player.life, 'current', this.markTeamDirty),
 			callbacks.listen(player.life, 'max', this.markTeamDirty),
+			callbacks.listen(player, 'isDowned', this.markTeamDirty),
 		);
 		this.markTeamDirty();
 	}
@@ -511,6 +516,41 @@ export class Hud {
 			(_, index) => this.createWeaponSlot(weaponRow, index),
 		);
 
+		const downedPanel = new GUI.Rectangle('PlayerDownedPanel');
+		downedPanel.width = '520px';
+		downedPanel.height = '96px';
+		downedPanel.horizontalAlignment =
+			GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+		downedPanel.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+		downedPanel.top = '150px';
+		downedPanel.scaleX = HUD_SCALE;
+		downedPanel.scaleY = HUD_SCALE;
+		downedPanel.zIndex = 25;
+		downedPanel.isVisible = false;
+		styleHudPanel(downedPanel, HUD_THEME.boss);
+		root.addControl(downedPanel);
+		const downedTitle = hudText(
+			'PlayerDownedTitle',
+			gameI18n.t('hud.downed').toUpperCase(),
+			24,
+			HUD_THEME.boss,
+		);
+		downedTitle.fontWeight = 'bold';
+		downedTitle.height = '34px';
+		downedTitle.top = '16px';
+		downedTitle.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
+		downedPanel.addControl(downedTitle);
+		const downedHint = hudText(
+			'PlayerDownedHint',
+			'',
+			14,
+			HUD_THEME.muted,
+		);
+		downedHint.height = '26px';
+		downedHint.top = '52px';
+		downedHint.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
+		downedPanel.addControl(downedHint);
+
 		return {
 			hpBar: hpBar.fill,
 			hpText,
@@ -528,7 +568,17 @@ export class Hud {
 			teamPanel,
 			teamCountText,
 			teammateSlots,
+			downedPanel,
+			downedHint,
 		};
+	}
+
+	setReviveKeyLabel(label: string): void {
+		if (this.reviveKeyLabel === label) return;
+		this.reviveKeyLabel = label;
+		this.controls.downedHint.text = gameI18n.t('hud.downedHint', {
+			key: label,
+		});
 	}
 
 	private createTeammateSlot(
@@ -685,6 +735,7 @@ export class Hud {
 
 	private updatePlayerHud(player: Player): void {
 		this.playerDirty = false;
+		this.controls.downedPanel.isVisible = player.isDowned;
 		const { hpBar, hpText, xpBar, xpText, levelText, killText } =
 			this.controls;
 		const { current, max } = player.life;
@@ -715,7 +766,7 @@ export class Hud {
 			slot.panel.isVisible = Boolean(teammate);
 			if (!teammate) continue;
 			const { current, max } = teammate.life;
-			const living = current > 0;
+			const living = !teammate.isDowned;
 			slot.status.background = living ? HUD_THEME.xp : HUD_THEME.boss;
 			slot.status.color = living
 				? HUD_THEME.allyOnline

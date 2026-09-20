@@ -38,6 +38,7 @@ class RemotePlayerView {
 	readonly mesh: BABYLON.AbstractMesh;
 	readonly animations: PlayerAnimationController;
 	private moving: boolean | null = null;
+	private downed: boolean | null = null;
 
 	constructor(
 		mesh: BABYLON.AbstractMesh,
@@ -50,11 +51,26 @@ class RemotePlayerView {
 	setMoving(moving: boolean): void {
 		if (this.moving === moving) return;
 		this.moving = moving;
+		if (this.downed) return;
 		if (moving) this.animations.playWalk();
 		else {
 			this.animations.playIdle();
 			this.mesh.rotation.z = 0;
 		}
+	}
+
+	setDowned(downed: boolean): void {
+		if (this.downed === downed) return;
+		const wasDowned = this.downed;
+		this.downed = downed;
+		if (downed) {
+			this.mesh.rotation.z = 0;
+			this.animations.playDowned();
+			return;
+		}
+		if (wasDowned === null) return;
+		this.animations.playRevive();
+		this.moving = null;
 	}
 
 	dispose(): void {
@@ -184,6 +200,15 @@ export class ServerOrchestrator {
 
 	setMonsterStressTest(enabled: boolean) {
 		this.room.send(ClientMessage.SetDebugMonsterStress, { enabled });
+	}
+
+	setReviveIntent(enabled: boolean) {
+		this.room.send(ClientMessage.Revive, { enabled });
+	}
+
+	getPlayerMesh(sessionId: string): BABYLON.AbstractMesh | undefined {
+		if (sessionId === this.room.sessionId) return this.player;
+		return this.remotePlayers.get(sessionId)?.mesh;
 	}
 
 	getMovementState() {
@@ -484,10 +509,12 @@ export class ServerOrchestrator {
 						player.z,
 					);
 					mesh.rotation.y = player.rotationY + Math.PI;
+					view.setDowned(player.isDowned);
 					view.setMoving(player.animState === 'moving');
 					subscriptions.add(
 						callbacks.onChange(player, () => {
 							this.setRemoteTarget(sessionId, player);
+							view.setDowned(player.isDowned);
 							view.setMoving(player.animState === 'moving');
 						}),
 					);

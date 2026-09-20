@@ -5,6 +5,7 @@ import { createFullscreenUi, getGuiControls, guiImports } from '../assets/ui';
 import {
 	DEFAULT_KEY_BINDINGS,
 	KEY_ACTIONS,
+	formatKeyLabel,
 	type KeyBindings,
 } from './KeyBindings';
 import { gameI18n } from '../i18n';
@@ -25,6 +26,8 @@ const KEY_BUTTON_NAMES: { [K in keyof KeyBindings]: string } = {
 	right: 'Key_Right',
 	left: 'Key_Left',
 	jump: 'Key_Jump',
+	stats: 'Key_Stats',
+	revive: 'Key_Revive',
 };
 
 export class SettingsMenuRender {
@@ -150,11 +153,7 @@ export class SettingsMenuRender {
 		const textBlock =
 			button.textBlock ??
 			button.children.find((child) => child instanceof GUI.TextBlock);
-		if (textBlock)
-			textBlock.text =
-				label === ' '
-					? gameI18n.t('settings.space')
-					: label.toUpperCase();
+		if (textBlock) textBlock.text = formatKeyLabel(label);
 	}
 
 	private resetKeybinds() {
@@ -196,6 +195,8 @@ export class SettingsMenuRender {
 			Label_Left: 'settings.moveLeft',
 			Label_Right: 'settings.moveRight',
 			Label_Jump: 'settings.jump',
+			Label_Stats: 'settings.stats',
+			Label_Revive: 'settings.revive',
 			ButtonReset_text: 'settings.resetDefaults',
 			ButtonBack_text: 'settings.back',
 		} as const;
