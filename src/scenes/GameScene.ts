@@ -46,6 +46,7 @@ const CAMERA_MIN_RADIUS = 2.5;
 const CAMERA_GROUND_CLEARANCE = 0.8;
 const CAMERA_PROBES = 8;
 const CAMERA_RETURN_SPEED = 6;
+const JOYSTICK_DEADZONE = 0.35;
 
 export class GameScene {
 	private readonly cleanups = new CleanupBag();
@@ -93,6 +94,8 @@ export class GameScene {
 	private monsters!: MonsterRenderer;
 	private hud!: Hud;
 	public readonly ready: Promise<void>;
+
+	private moveJoystick: BABYLON.VirtualJoystick | null = null; // to remove
 
 	constructor(engine: Engine, room: COLYSEUS.Room<GameState>, seed: number) {
 		this.engine = engine;
@@ -177,6 +180,15 @@ export class GameScene {
 				);
 			});
 
+			// To remove
+			if (navigator.maxTouchPoints > 0) {
+				this.moveJoystick = new BABYLON.VirtualJoystick(true);
+				this.defer(() => {
+					this.moveJoystick?.releaseCanvas();
+					this.moveJoystick = null;
+				});
+			}
+			//
 			music.play();
 			this.renderLoop();
 		} catch (e) {
@@ -296,10 +308,27 @@ export class GameScene {
 			const previousLeft = input.left;
 			const previousCameraYaw = input.cameraYaw;
 			input.seq = this.seq;
-			input.forward = this.input.isPressed(this.keybinds.forward);
-			input.backward = this.input.isPressed(this.keybinds.backward);
-			input.right = this.input.isPressed(this.keybinds.right);
-			input.left = this.input.isPressed(this.keybinds.left);
+
+			// Mobile Joystick test but don't want to keep it
+			let joyForward = false;
+			let joyBackward = false;
+			let joyLeft = false;
+			let joyRight = false;
+			if (this.moveJoystick?.pressed) {
+				const dx = this.moveJoystick.deltaPosition.x;
+				const dy = this.moveJoystick.deltaPosition.y;
+				joyForward = dy > JOYSTICK_DEADZONE;
+				joyBackward = dy < -JOYSTICK_DEADZONE;
+				joyRight = dx > JOYSTICK_DEADZONE;
+				joyLeft = dx < -JOYSTICK_DEADZONE;
+			}
+			//
+			input.forward =
+				this.input.isPressed(this.keybinds.forward) || joyForward; // to remove
+			input.backward =
+				this.input.isPressed(this.keybinds.backward) || joyBackward; // to remove
+			input.right = this.input.isPressed(this.keybinds.right) || joyRight; // to remove
+			input.left = this.input.isPressed(this.keybinds.left) || joyLeft; // to remove
 			input.jump = jumpTriggered;
 			input.deltaTime = deltaTime;
 			input.cameraYaw = cameraYaw;
