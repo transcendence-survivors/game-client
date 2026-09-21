@@ -52,6 +52,7 @@ export class LevelUpMenu {
 	private cards: UpgradeCardControls[] = [];
 	private readonly subscriptions = new CleanupBag();
 	private disposed = false;
+	private blocked = false;
 
 	constructor(scene: Scene, room: COLYSEUS.Room<GameState>) {
 		this.room = room;
@@ -126,6 +127,20 @@ export class LevelUpMenu {
 
 	isOpen(): boolean {
 		return this.levelUpRootContainer?.isVisible === true;
+	}
+
+	setInteractionBlocked(blocked: boolean) {
+		if (this.blocked === blocked) return;
+		this.blocked = blocked;
+		for (const card of this.cards) {
+			card.panel.isEnabled = !blocked;
+			if (blocked) {
+				card.panel.background = HUD_THEME.panelSoft;
+				card.panel.color = card.accentColor;
+				card.panel.scaleX = 1;
+				card.panel.scaleY = 1;
+			}
+		}
 	}
 
 	dispose(): void {
@@ -212,6 +227,7 @@ export class LevelUpMenu {
 		});
 		const keyDownHandler = (e: KeyboardEvent) => {
 			if (!this.levelUpRootContainer.isVisible) return;
+			if (this.blocked) return;
 			const selectionIndex = Number(e.key) - 1;
 			if (
 				Number.isInteger(selectionIndex) &&
@@ -264,6 +280,7 @@ export class LevelUpMenu {
 	private selectUpgrade(index: number): void {
 		if (this.queue.isDowned()) return;
 		if (!this.levelUpRootContainer.isVisible) return;
+		if (this.blocked) return;
 
 		const chosen = this.currentOptions[index];
 		if (!chosen) return;

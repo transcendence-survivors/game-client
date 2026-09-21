@@ -462,6 +462,8 @@ export class GameScene {
 			const statsKeyPressed = this.input.isPressed(this.keybinds.stats);
 			const toggleStats = statsKeyPressed && !this.statsKeyWasPressed;
 			this.statsKeyWasPressed = statsKeyPressed;
+			const settingsOpen = this.settings.isOpen();
+			this.levelUpMenu.setInteractionBlocked(settingsOpen);
 			const menuOpen =
 				this.settings.isOpen() || this.levelUpMenu.isOpen();
 			if (menuOpen) this.statsPanel.close();
