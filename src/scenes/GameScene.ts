@@ -28,9 +28,12 @@ import {
 import { models } from '../assets/models';
 import { Hud } from '../hud/Hud';
 import { LevelUpMenu } from '../hud/LevelUpMenu';
+import { StatsPanel } from '../hud/StatsPanel';
+import { RevivePrompt } from '../hud/RevivePrompt';
 
 import {
 	DEFAULT_KEY_BINDINGS,
+	formatKeyLabel,
 	type KeyBindings,
 } from '../settings/KeyBindings';
 
@@ -79,6 +82,10 @@ export class GameScene {
 	};
 
 	private settingsKeyWasPressed = false;
+	private statsKeyWasPressed = false;
+	private reviveIntentSent = false;
+	private lastReviveKey = '';
+	private downedLastFrame = false;
 	private readonly cameraForwardAxis = BABYLON.Vector3.Forward();
 	private readonly cameraForward = BABYLON.Vector3.Zero();
 	private cameraProbeInitialized = false;
@@ -93,6 +100,9 @@ export class GameScene {
 	private server!: ServerOrchestrator;
 	private monsters!: MonsterRenderer;
 	private hud!: Hud;
+	private statsPanel!: StatsPanel;
+	private revivePrompt!: RevivePrompt;
+	private levelUpMenu!: LevelUpMenu;
 	public readonly ready: Promise<void>;
 
 	private moveJoystick: BABYLON.VirtualJoystick | null = null; // to remove
@@ -162,7 +172,13 @@ export class GameScene {
 			this.server.setCombatHitboxesVisible(hitboxesVisible);
 
 			this.hud = this.track(new Hud(this.scene, room));
-			this.track(new LevelUpMenu(this.scene, room));
+			this.statsPanel = this.track(new StatsPanel(this.scene, room));
+			this.revivePrompt = this.track(
+				new RevivePrompt(this.scene, room, (sessionId) =>
+					this.server.getPlayerMesh(sessionId),
+				),
+			);
+			this.levelUpMenu = this.track(new LevelUpMenu(this.scene, room));
 			this.settings = this.track(
 				new SettingsMenuRender(this.scene, this.camera, this.keybinds),
 			);
@@ -332,19 +348,35 @@ export class GameScene {
 			input.jump = jumpTriggered;
 			input.deltaTime = deltaTime;
 			input.cameraYaw = cameraYaw;
-			const moving =
-				input.forward || input.backward || input.right || input.left;
-			if (moving) {
-				this.playerAnimations.playWalk();
-			} else {
-				this.playerAnimations.playIdle();
-				if (this.player.rotation.z !== 0) this.player.rotation.z = 0;
-			}
-			const currentState = this.server.getMovementState();
-			const world = this.mapGen.getWorld();
 			const room = this.server.getRoom();
 			const playerInRoom = room.state.players.get(room.sessionId);
 			if (!playerInRoom) return;
+			const downed = playerInRoom.isDowned;
+			if (downed) {
+				input.forward = false;
+				input.backward = false;
+				input.right = false;
+				input.left = false;
+				input.jump = false;
+			}
+			const moving =
+				input.forward || input.backward || input.right || input.left;
+			if (downed) {
+				this.playerAnimations.playDowned();
+				if (!this.downedLastFrame) this.networkInputCadence.reset();
+			} else {
+				if (this.downedLastFrame) this.playerAnimations.playRevive();
+				if (moving) {
+					this.playerAnimations.playWalk();
+				} else {
+					this.playerAnimations.playIdle();
+					if (this.player.rotation.z !== 0)
+						this.player.rotation.z = 0;
+				}
+			}
+			this.downedLastFrame = downed;
+			const currentState = this.server.getMovementState();
+			const world = this.mapGen.getWorld();
 			this.movementBoundary.centerX = room.state.rayX;
 			this.movementBoundary.centerZ = room.state.rayZ;
 			const newState = simulatePlayerMovement(
@@ -362,11 +394,13 @@ export class GameScene {
 			if (playerPosition.z !== newState.z) playerPosition.z = newState.z;
 			if (this.player.rotation.y !== newState.rotationY)
 				this.player.rotation.y = newState.rotationY;
-			const networkDeltaTime = this.networkInputCadence.advance(
-				deltaTime,
-				moving || !newState.isGrounded,
-				jumpTriggered,
-			);
+			const networkDeltaTime = downed
+				? null
+				: this.networkInputCadence.advance(
+						deltaTime,
+						moving || !newState.isGrounded,
+						jumpTriggered,
+					);
 			const previousStateDeltaTime =
 				this.networkInputCadence.takePreviousStateDeltaTime();
 			if (previousStateDeltaTime > 0) {
@@ -412,7 +446,23 @@ export class GameScene {
 			this.clampCameraToTerrain(deltaTime);
 			this.forest.update(this.player.position);
 			this.hud.update();
+			this.statsPanel.update();
+			this.updateReviveIntent(downed);
+			if (this.lastReviveKey !== this.keybinds.revive) {
+				this.lastReviveKey = this.keybinds.revive;
+				const keyLabel = formatKeyLabel(this.keybinds.revive);
+				this.revivePrompt.setKeyLabel(keyLabel);
+				this.hud.setReviveKeyLabel(keyLabel);
+			}
+			this.revivePrompt.update();
 			this.debugMenu.updateDebugMenu(this.player);
+			const statsKeyPressed = this.input.isPressed(this.keybinds.stats);
+			const toggleStats = statsKeyPressed && !this.statsKeyWasPressed;
+			this.statsKeyWasPressed = statsKeyPressed;
+			const menuOpen =
+				this.settings.isOpen() || this.levelUpMenu.isOpen();
+			if (menuOpen) this.statsPanel.close();
+			else if (toggleStats) this.statsPanel.toggle(this.keybinds.stats);
 			const pKeyPressed = this.input.isPressed('p');
 			const toggleSettings = pKeyPressed && !this.settingsKeyWasPressed;
 			this.settingsKeyWasPressed = pKeyPressed;
@@ -426,6 +476,16 @@ export class GameScene {
 				}
 			}
 		});
+	}
+
+	private updateReviveIntent(downed: boolean): void {
+		const holding =
+			!downed &&
+			!this.settings.isOpen() &&
+			this.input.isPressed(this.keybinds.revive);
+		if (holding === this.reviveIntentSent) return;
+		this.reviveIntentSent = holding;
+		this.server.setReviveIntent(holding);
 	}
 
 	private async addPlayer() {

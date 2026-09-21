@@ -4,91 +4,10 @@ import * as COLYSEUS from '@colyseus/sdk';
 import type { GameState } from '../../../shared-package/src';
 import { guiImports } from '../assets/ui';
 import { SceneManager } from './SceneManager';
-import type { PlayerStats } from '../../../shared-package/src/schemas/GameState';
-import { iconsImport } from '../assets/icons';
-import { gameI18n, type TranslationKey } from '../i18n';
+import { gameI18n } from '../i18n';
 import { setText } from '../i18n/gui';
 import { formatGameTime } from '../hud/HudFormatting';
-
-interface StatDef {
-	key: keyof PlayerStats;
-	labelKey: TranslationKey;
-	icon: string;
-	format?: (v: number) => string;
-}
-
-const STAT_DEFS: StatDef[] = [
-	{
-		key: 'attackDamage',
-		labelKey: 'stats.damage',
-		icon: iconsImport.tomeDamage,
-	},
-	{
-		key: 'attackSpeed',
-		labelKey: 'stats.attackSpeed',
-		icon: iconsImport.attackSpeed,
-		format: (v) => `${v.toFixed(2)}/s`,
-	},
-	{
-		key: 'moveSpeed',
-		labelKey: 'stats.moveSpeed',
-		icon: iconsImport.tomeAgility,
-	},
-	{
-		key: 'armor',
-		labelKey: 'stats.armor',
-		icon: iconsImport.tomeArmor,
-		format: (v) => `${Math.round(v)}`,
-	},
-	{
-		key: 'lifesteal',
-		labelKey: 'stats.lifesteal',
-		icon: iconsImport.tomeBlood,
-		format: (v) => `${v.toFixed(1)}%`,
-	},
-	{ key: 'range', labelKey: 'stats.range', icon: iconsImport.tomeRange },
-	{
-		key: 'maxHealth',
-		labelKey: 'stats.maxHealth',
-		icon: iconsImport.tomeVitality,
-	},
-	{
-		key: 'size',
-		labelKey: 'stats.size',
-		icon: iconsImport.tomeSize,
-		format: (v) => `${(v * 100).toFixed(0)}%`,
-	},
-	{
-		key: 'duration',
-		labelKey: 'stats.duration',
-		icon: iconsImport.tomeDuration,
-		format: (v) => `${(v * 100).toFixed(0)}%`,
-	},
-	{
-		key: 'quantity',
-		labelKey: 'stats.quantity',
-		icon: iconsImport.tomeQuantity,
-		format: (v) => `+${Math.round(v)}`,
-	},
-	{
-		key: 'penetration',
-		labelKey: 'stats.penetration',
-		icon: iconsImport.penetration,
-		format: (v) => `+${Math.round(v)}`,
-	},
-	{
-		key: 'luck',
-		labelKey: 'stats.luck',
-		icon: iconsImport.tomeFortune,
-		format: (v) => `${v.toFixed(2)}x`,
-	},
-	{
-		key: 'killAmount',
-		labelKey: 'stats.kills',
-		icon: iconsImport.kills,
-		format: (v) => `${Math.round(v)}`,
-	},
-];
+import { readStatValue, STAT_DEFS } from '../hud/StatDefinitions';
 
 export class EndingScreen {
 	private advTex!: GUI.AdvancedDynamicTexture;
@@ -153,10 +72,8 @@ export class EndingScreen {
 			}
 
 			icon.source = def.icon;
-			const rawValue = stats[def.key] as number;
-			text.text = `${gameI18n.t(def.labelKey)}: ${
-				def.format ? def.format(rawValue) : rawValue
-			}`;
+			const value = readStatValue(stats, def);
+			text.text = `${gameI18n.t(def.labelKey)}: ${value}`;
 		});
 
 		const kills = this.advTex.getControlByName('Kills') as GUI.TextBlock;
