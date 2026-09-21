@@ -10,6 +10,7 @@ import {
 } from './KeyBindings';
 import { gameI18n } from '../i18n';
 import { setText } from '../i18n/gui';
+import { STORAGE_KEY } from '../scenes/GameScene';
 
 interface SettingsControls {
 	fovSlider: GUI.Slider;
@@ -35,18 +36,14 @@ export class SettingsMenuRender {
 	private advTex!: GUI.AdvancedDynamicTexture;
 	public readonly ready: Promise<void>;
 	private readonly camera: BABYLON.ArcRotateCamera;
-	private readonly keybinds: KeyBindings;
+	private keybinds: KeyBindings;
 	private keyButtons!: KeyButtons;
 	private awaitingBindFor: keyof KeyBindings | null = null;
 
-	constructor(
-		scene: Scene,
-		camera: BABYLON.ArcRotateCamera,
-		keybinds: KeyBindings,
-	) {
+	constructor(scene: Scene, camera: BABYLON.ArcRotateCamera) {
 		this.scene = scene;
 		this.camera = camera;
-		this.keybinds = keybinds;
+		this.keybinds = this.loadKeybindings();
 		this.ready = this.init();
 	}
 
@@ -61,6 +58,56 @@ export class SettingsMenuRender {
 		this.applyTranslations();
 		this.updatePointerEvents();
 		this.linkControls();
+	}
+
+	public getKeybindings(): Readonly<KeyBindings> {
+		return this.keybinds;
+	}
+
+	private saveKeybindings(bindings: Readonly<KeyBindings>) {
+		try {
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(bindings));
+		} catch (error) {
+			console.warn('Failed to save keybindings:', error);
+		}
+	}
+
+	private resetKeybindings() {
+		localStorage.removeItem(STORAGE_KEY);
+		return { ...DEFAULT_KEY_BINDINGS };
+	}
+
+	private loadKeybindings(): KeyBindings {
+		try {
+			const raw = localStorage.getItem(STORAGE_KEY);
+			if (!raw) {
+				return { ...DEFAULT_KEY_BINDINGS };
+			}
+			const parsed = JSON.parse(raw);
+			if (typeof parsed !== 'object' || parsed === null)
+				return { ...DEFAULT_KEY_BINDINGS };
+
+			const result = { ...DEFAULT_KEY_BINDINGS };
+			for (const action of KEY_ACTIONS) {
+				const value = (parsed as Record<string, unknown>)[action];
+				if (typeof value === 'string' && value.length > 0) {
+					result[action] = value;
+				}
+			}
+			return result;
+		} catch (error) {
+			console.warn('Failed to load keybindings, using defaults:', error);
+			return { ...DEFAULT_KEY_BINDINGS };
+		}
+	}
+
+	private applyReset() {
+		const defaults = this.resetKeybindings();
+		Object.assign(this.keybinds, defaults);
+
+		for (const action of KEY_ACTIONS) {
+			this.setButtonLabel(this.keyButtons[action], this.keybinds[action]);
+		}
 	}
 
 	dispose() {
@@ -109,7 +156,7 @@ export class SettingsMenuRender {
 
 		buttonBack.onPointerUpObservable.add(() => this.close());
 
-		buttonReset.onPointerUpObservable.add(() => this.resetKeybinds());
+		buttonReset.onPointerUpObservable.add(() => this.applyReset());
 
 		for (const action of KEY_ACTIONS) {
 			const button = this.keyButtons[action];
@@ -147,6 +194,7 @@ export class SettingsMenuRender {
 		this.awaitingBindFor = null;
 
 		this.setButtonLabel(this.keyButtons[action], key);
+		this.saveKeybindings(this.keybinds);
 	}
 
 	private setButtonLabel(button: GUI.Button, label: string) {
@@ -154,15 +202,6 @@ export class SettingsMenuRender {
 			button.textBlock ??
 			button.children.find((child) => child instanceof GUI.TextBlock);
 		if (textBlock) textBlock.text = formatKeyLabel(label);
-	}
-
-	private resetKeybinds() {
-		Object.assign(this.keybinds, DEFAULT_KEY_BINDINGS);
-		for (const action of KEY_ACTIONS)
-			this.setButtonLabel(
-				this.keyButtons[action],
-				DEFAULT_KEY_BINDINGS[action],
-			);
 	}
 
 	private cancelRebind(action: keyof KeyBindings) {

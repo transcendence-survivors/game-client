@@ -34,6 +34,7 @@ import { RevivePrompt } from '../hud/RevivePrompt';
 import {
 	DEFAULT_KEY_BINDINGS,
 	formatKeyLabel,
+	KEY_ACTIONS,
 	type KeyBindings,
 } from '../settings/KeyBindings';
 
@@ -50,6 +51,7 @@ const CAMERA_GROUND_CLEARANCE = 0.8;
 const CAMERA_PROBES = 8;
 const CAMERA_RETURN_SPEED = 6;
 const JOYSTICK_DEADZONE = 0.35;
+export const STORAGE_KEY = 'game_keyBindings';
 
 export class GameScene {
 	private readonly cleanups = new CleanupBag();
@@ -180,10 +182,11 @@ export class GameScene {
 			);
 			this.levelUpMenu = this.track(new LevelUpMenu(this.scene, room));
 			this.settings = this.track(
-				new SettingsMenuRender(this.scene, this.camera, this.keybinds),
+				new SettingsMenuRender(this.scene, this.camera),
 			);
 			await this.settings.ready;
 			this.settings.close();
+			this.keybinds = this.settings.getKeybindings();
 
 			const canvas = this.scene.getEngine().getRenderingCanvas();
 			canvas?.addEventListener('pointerdown', this.boundOnClick);

@@ -83,7 +83,7 @@ export class DebugMenu {
 			EMPTY_MONSTER_STATS,
 	) {
 		this.engine = engine;
-		this.enabled = true;
+		this.enabled = enabled;
 		this.gpuTimingSupported =
 			enabled && Boolean(engine.getCaps().timerQuery);
 		this.instrumentation = enabled
@@ -134,6 +134,7 @@ export class DebugMenu {
 		debugMenu.zIndex = 50;
 		styleHudPanel(debugMenu, HUD_THEME.xp);
 		this.ui.addControl(debugMenu);
+		debugMenu.isVisible = this.panelVisible;
 
 		const panel = new GUI.StackPanel('DebugContent');
 		panel.paddingTop = '16px';
