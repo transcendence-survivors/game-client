@@ -7,6 +7,7 @@ import { normalizeRoomName, type GameState } from '@transcendence/game-shared';
 import { createFullscreenUi, getGuiControls, guiImports } from '../assets/ui';
 import { gameI18n } from '../i18n';
 import { setInputPlaceholder, setText } from '../i18n/gui';
+import type { UserInfos } from '../../../shared-package/src/utils/Types';
 
 interface LobbyControls {
 	input: GUI.InputText;
@@ -21,13 +22,14 @@ export const STORAGE_COLYSEUS_ROOM_ID_STR = 'colyseus_room_id';
 export class LobbyScene {
 	private scene: BABYLON.Scene;
 	private advTex!: GUI.AdvancedDynamicTexture;
-	private network: NetworkManager = new NetworkManager();
+	private network!: NetworkManager;
 	private engine: BABYLON.Engine;
 	private room!: COLYSEUS.Room<GameState>;
 	public readonly ready: Promise<void>;
 
-	constructor(engine: BABYLON.Engine) {
+	constructor(engine: BABYLON.Engine, user: UserInfos) {
 		this.engine = engine;
+		this.network = new NetworkManager(user);
 		this.scene = new BABYLON.Scene(this.engine);
 		new BABYLON.FreeCamera('LobbyCam', BABYLON.Vector3.Zero(), this.scene);
 		this.ready = this.show();

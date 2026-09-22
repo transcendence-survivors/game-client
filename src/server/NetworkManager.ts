@@ -5,12 +5,15 @@ import {
 	type GameRoomOptions,
 	type GameState,
 } from '@transcendence/game-shared';
+import type { UserInfos } from '../../../shared-package/src/utils/Types';
 
 export class NetworkManager {
 	private readonly client: Client;
+	private readonly user: UserInfos;
 
-	constructor() {
+	constructor(user: UserInfos) {
 		const host = window.location.hostname;
+		this.user = user;
 		this.client = new Client(`ws://${host}:4000`);
 	}
 
@@ -35,6 +38,7 @@ export class NetworkManager {
 	private roomOptions(rawName: string): GameRoomOptions {
 		const roomName = normalizeRoomName(rawName);
 		if (!roomName) throw new Error('Empty room name');
-		return { roomName };
+		const user = this.user;
+		return { roomName, user };
 	}
 }

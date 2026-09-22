@@ -107,7 +107,15 @@ export class WaitingScreen {
 			readyIndicator.source = iconsImport.notReadyIndicator;
 			return;
 		}
-		pp.source = iconsImport.ppPh;
+		if (player.avatarUrl === '') pp.source = iconsImport.ppPh;
+		else pp.source = player.avatarUrl;
+
+		const domImage = pp.domImage;
+		if (domImage) {
+			domImage.onerror = () => {
+				pp.source = iconsImport.ppPh;
+			};
+		}
 		usernamePh.text = player.username;
 		readyIndicator.source = player.ready
 			? iconsImport.readyIndicator

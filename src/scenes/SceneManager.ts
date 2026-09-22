@@ -6,6 +6,7 @@ import * as COLYSEUS from '@colyseus/sdk';
 import type { GameState } from '../../../shared-package/src';
 import { EndingScreen } from './EndingScreen';
 import { WaitingScreen } from './WaitingScreen';
+import type { UserInfos } from '../../../shared-package/src/utils/Types';
 
 export interface ManagedScene {
 	render(): void;
@@ -17,9 +18,22 @@ export class SceneManager {
 	private static engine: Engine;
 	private static currentScene: ManagedScene | undefined;
 	private static transitionSequence = 0;
+	private static user: UserInfos = {
+		username: '',
+		userId: '',
+		avatarUrl: '',
+	};
 
-	static init(engine: Engine) {
+	static init(
+		engine: Engine,
+		username: string,
+		userId: string,
+		avatarUrl?: string,
+	) {
 		SceneManager.engine = engine;
+		this.user.username = username;
+		this.user.userId = userId;
+		this.user.avatarUrl = avatarUrl;
 	}
 
 	static toMainMenu() {
@@ -35,7 +49,7 @@ export class SceneManager {
 	}
 
 	static toLobby() {
-		return SceneManager.set(new LobbyScene(this.engine));
+		return SceneManager.set(new LobbyScene(this.engine, this.user));
 	}
 
 	static toEndScreen(room: COLYSEUS.Room<GameState>) {
