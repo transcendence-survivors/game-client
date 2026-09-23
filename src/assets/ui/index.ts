@@ -8,6 +8,7 @@ export const guiImports = {
 	levelup: new URL('./level_up_menu.json', import.meta.url).href,
 	endingScreen: new URL('./ending_screen.json', import.meta.url).href,
 	waitingScreen: new URL('./waiting_room_ui.json', import.meta.url).href,
+	testVideo: new URL('./test.mp4', import.meta.url).href,
 } as const;
 
 export function createFullscreenUi(
