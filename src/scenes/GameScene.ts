@@ -34,7 +34,6 @@ import { RevivePrompt } from '../hud/RevivePrompt';
 import {
 	DEFAULT_KEY_BINDINGS,
 	formatKeyLabel,
-	KEY_ACTIONS,
 	type KeyBindings,
 } from '../settings/KeyBindings';
 
@@ -42,6 +41,7 @@ import { CleanupBag } from '../CleanupBag';
 import { NetworkInputCadence } from '../performance/NetworkInputCadence';
 import { LevelUpShaderEffect } from '../effects/LevelUpShaderEffect';
 import { createGameMusic } from '../audio/GameMusic';
+import { MobileControls, type MobileAction } from '../hud/MobileControls';
 
 const CAMERA_NEAR = 0.1;
 const CAMERA_FAR = 600;
@@ -51,6 +51,7 @@ const CAMERA_GROUND_CLEARANCE = 0.8;
 const CAMERA_PROBES = 8;
 const CAMERA_RETURN_SPEED = 6;
 const JOYSTICK_DEADZONE = 0.35;
+const TOUCH_CAMERA_SENSITIVITY = 0.006;
 export const STORAGE_KEY = 'game_keyBindings';
 
 export class GameScene {
@@ -107,7 +108,12 @@ export class GameScene {
 	private levelUpMenu!: LevelUpMenu;
 	public readonly ready: Promise<void>;
 
-	private moveJoystick: BABYLON.VirtualJoystick | null = null; // to remove
+	private moveJoystick: BABYLON.VirtualJoystick | null = null;
+	private mobileControls: MobileControls | null = null;
+
+	private touchCameraPointerId: number | null = null;
+	private touchCameraLastX = 0;
+	private touchCameraLastY = 0;
 
 	constructor(engine: Engine, room: COLYSEUS.Room<GameState>, seed: number) {
 		this.engine = engine;
@@ -199,15 +205,21 @@ export class GameScene {
 				);
 			});
 
-			// To remove
 			if (navigator.maxTouchPoints > 0) {
 				this.moveJoystick = new BABYLON.VirtualJoystick(true);
+				if (BABYLON.VirtualJoystick.Canvas)
+					BABYLON.VirtualJoystick.Canvas.style.clipPath =
+						'inset(0 65% 0 0)';
+				this.mobileControls = this.track(
+					new MobileControls(this.scene),
+				);
+				this.setupTouchCameraControl();
 				this.defer(() => {
 					this.moveJoystick?.releaseCanvas();
 					this.moveJoystick = null;
 				});
 			}
-			//
+
 			music.play();
 			this.renderLoop();
 		} catch (e) {
@@ -317,7 +329,7 @@ export class GameScene {
 				this.cameraForward,
 			);
 			const cameraYaw = getCameraYaw(this.cameraForward);
-			const jumpKeyPressed = this.input.isPressed(this.keybinds.jump);
+			const jumpKeyPressed = this.isActionPressed('jump');
 			const jumpTriggered = jumpKeyPressed && !this.jumpKeyWasPressed;
 			this.jumpKeyWasPressed = jumpKeyPressed;
 			const input = this.simulationInput;
@@ -328,7 +340,6 @@ export class GameScene {
 			const previousCameraYaw = input.cameraYaw;
 			input.seq = this.seq;
 
-			// Mobile Joystick test but don't want to keep it
 			let joyForward = false;
 			let joyBackward = false;
 			let joyLeft = false;
@@ -341,13 +352,12 @@ export class GameScene {
 				joyRight = dx > JOYSTICK_DEADZONE;
 				joyLeft = dx < -JOYSTICK_DEADZONE;
 			}
-			//
 			input.forward =
-				this.input.isPressed(this.keybinds.forward) || joyForward; // to remove
+				this.input.isPressed(this.keybinds.forward) || joyForward;
 			input.backward =
-				this.input.isPressed(this.keybinds.backward) || joyBackward; // to remove
-			input.right = this.input.isPressed(this.keybinds.right) || joyRight; // to remove
-			input.left = this.input.isPressed(this.keybinds.left) || joyLeft; // to remove
+				this.input.isPressed(this.keybinds.backward) || joyBackward;
+			input.right = this.input.isPressed(this.keybinds.right) || joyRight;
+			input.left = this.input.isPressed(this.keybinds.left) || joyLeft;
 			input.jump = jumpTriggered;
 			input.deltaTime = deltaTime;
 			input.cameraYaw = cameraYaw;
@@ -459,7 +469,7 @@ export class GameScene {
 			}
 			this.revivePrompt.update();
 			this.debugMenu.updateDebugMenu(this.player);
-			const statsKeyPressed = this.input.isPressed(this.keybinds.stats);
+			const statsKeyPressed = this.isActionPressed('stats');
 			const toggleStats = statsKeyPressed && !this.statsKeyWasPressed;
 			this.statsKeyWasPressed = statsKeyPressed;
 			const settingsOpen = this.settings.isOpen();
@@ -488,7 +498,7 @@ export class GameScene {
 		const holding =
 			!downed &&
 			!this.settings.isOpen() &&
-			this.input.isPressed(this.keybinds.revive);
+			this.isActionPressed('revive');
 		if (holding === this.reviveIntentSent) return;
 		this.reviveIntentSent = holding;
 		this.server.setReviveIntent(holding);
@@ -524,6 +534,7 @@ export class GameScene {
 
 	private boundOnClick = () => {
 		if (this.settings.isOpen()) return;
+		if (navigator.maxTouchPoints > 0) return;
 		const canvas = this.engine.getRenderingCanvas();
 		if (!canvas) return;
 		try {
@@ -551,4 +562,65 @@ export class GameScene {
 			);
 		}
 	};
+
+	private isActionPressed(action: MobileAction & keyof KeyBindings) {
+		return (
+			this.input.isPressed(this.keybinds[action]) ||
+			(this.mobileControls?.isPressed(action) ?? false)
+		);
+	}
+
+	private setupTouchCameraControl() {
+		const canvas = this.engine.getRenderingCanvas();
+		if (!canvas) return;
+
+		const observer = this.scene.onPointerObservable.add((pointerInfo) => {
+			const event = pointerInfo.event as PointerEvent;
+			if (event.pointerType !== 'touch') return;
+
+			if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN) {
+				if (this.touchCameraPointerId !== null) return;
+				if (this.settings.isOpen()) return;
+				const isRightHalf = event.clientX > canvas.clientWidth / 2;
+				if (!isRightHalf) return;
+				this.touchCameraPointerId = event.pointerId;
+				this.touchCameraLastX = event.clientX;
+				this.touchCameraLastY = event.clientY;
+				return;
+			}
+			if (event.pointerId !== this.touchCameraPointerId) return;
+
+			if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERMOVE) {
+				const deltaX = event.clientX - this.touchCameraLastX;
+				const deltaY = event.clientY - this.touchCameraLastY;
+				this.touchCameraLastX = event.clientX;
+				this.touchCameraLastY = event.clientY;
+				this.camera.alpha -= deltaX * TOUCH_CAMERA_SENSITIVITY;
+				this.camera.beta -= deltaY * TOUCH_CAMERA_SENSITIVITY;
+				this.camera.beta = Math.max(
+					this.camera.lowerBetaLimit as number,
+					Math.min(
+						this.camera.upperBetaLimit as number,
+						this.camera.beta,
+					),
+				);
+			} else if (
+				pointerInfo.type === BABYLON.PointerEventTypes.POINTERUP
+			) {
+				this.touchCameraPointerId = null;
+			}
+		});
+
+		const onPointerCancel = (e: PointerEvent) => {
+			if (e.pointerId === this.touchCameraPointerId)
+				this.touchCameraPointerId = null;
+		};
+		canvas.addEventListener('pointercancel', onPointerCancel);
+
+		this.defer(() => {
+			this.scene.onPointerObservable.remove(observer);
+			canvas.removeEventListener('pointercancel', onPointerCancel);
+			this.touchCameraPointerId = null;
+		});
+	}
 }
