@@ -1,7 +1,7 @@
 import type { TranslationCatalog } from '../types';
 
 const de = {
-	'menu.title': 'Transcendence Survivors',
+	'menu.title': 'Light Keepers',
 	'menu.play': 'Spielen',
 	'menu.language': 'Sprache: {language}',
 	'language.en': 'Englisch',
@@ -10,7 +10,7 @@ const de = {
 	'language.es': 'Spanisch',
 	'language.che': 'Schweizerdeutsch',
 	'language.it': 'Italienisch',
-	'lobby.title': 'Transcendence Survivors',
+	'lobby.title': 'Light Keepers',
 	'lobby.roomNamePlaceholder': 'Raumname',
 	'lobby.createRoom': 'Raum erstellen',
 	'lobby.joinRoom': 'Raum beitreten',
@@ -66,7 +66,8 @@ const de = {
 	'hud.ally': 'Verbündeter {number}',
 	'hud.knockedOut': 'K. O.',
 	'hud.downed': 'Du liegst am Boden',
-	'hud.downedHint': 'Halte {key} neben einem Verbündeten gedrückt, um ihn aufzurichten',
+	'hud.downedHint':
+		'Halte {key} neben einem Verbündeten gedrückt, um ihn aufzurichten',
 	'hud.empty': 'Leer',
 	'upgrade.heading': 'WÄHLE EINE VERBESSERUNG',
 	'upgrade.subtitle': 'Drücke 1, 2 oder 3 — oder klicke auf eine Karte',

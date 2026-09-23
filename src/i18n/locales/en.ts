@@ -1,5 +1,5 @@
 const en = {
-	'menu.title': 'Transcendence Survivors',
+	'menu.title': 'Light Keepers',
 	'menu.play': 'Play',
 	'menu.language': 'Language: {language}',
 	'language.en': 'English',
@@ -8,7 +8,7 @@ const en = {
 	'language.es': 'Spanish',
 	'language.che': 'Swiss German',
 	'language.it': 'Italian',
-	'lobby.title': 'Transcendence Survivors',
+	'lobby.title': 'Light Keepers',
 	'lobby.roomNamePlaceholder': 'Room name',
 	'lobby.createRoom': 'Create Room',
 	'lobby.joinRoom': 'Join Room',

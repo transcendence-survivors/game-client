@@ -1,7 +1,7 @@
 import type { TranslationCatalog } from '../types';
 
 const es = {
-	'menu.title': 'Transcendence Survivors',
+	'menu.title': 'Light Keepers',
 	'menu.play': 'Jugar',
 	'menu.language': 'Idioma: {language}',
 	'language.en': 'Inglés',
@@ -10,7 +10,7 @@ const es = {
 	'language.es': 'Español',
 	'language.che': 'Alemán suizo',
 	'language.it': 'Italiano',
-	'lobby.title': 'Transcendence Survivors',
+	'lobby.title': 'Light Keepers',
 	'lobby.roomNamePlaceholder': 'Nombre de la sala',
 	'lobby.createRoom': 'Crear sala',
 	'lobby.joinRoom': 'Unirse a una sala',

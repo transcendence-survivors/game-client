@@ -472,6 +472,7 @@ export class GameScene {
 			const toggleSettings = pKeyPressed && !this.settingsKeyWasPressed;
 			this.settingsKeyWasPressed = pKeyPressed;
 			if (toggleSettings) {
+				if (navigator.maxTouchPoints > 0) return;
 				if (!this.settings.isOpen()) {
 					this.settings.open();
 					document.exitPointerLock();

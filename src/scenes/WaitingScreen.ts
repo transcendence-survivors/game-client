@@ -112,6 +112,7 @@ export class WaitingScreen {
 
 		const domImage = pp.domImage;
 		if (domImage) {
+			domImage.crossOrigin = 'anonymous';
 			domImage.onerror = () => {
 				pp.source = iconsImport.ppPh;
 			};
