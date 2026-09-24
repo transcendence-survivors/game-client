@@ -129,7 +129,6 @@ export class WaitingScreen {
 		) as GUI.Button;
 
 		const text = this.advTex.getControlByName('ReadyText') as GUI.TextBlock;
-		// TODO
 		button.onPointerDownObservable.add(() => {
 			const player = this.room.state.players.get(this.room.sessionId);
 			if (!player) {

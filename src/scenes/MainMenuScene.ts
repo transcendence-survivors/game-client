@@ -27,7 +27,7 @@ export class MainMenuScene {
 	private languageOptionsOpen = false;
 	private unsubscribeLocale?: () => void;
 
-	//TEST
+	//TODO
 	private backgroundLayer!: BABYLON.Layer;
 	private videoTexture!: BABYLON.VideoTexture;
 	//
@@ -55,7 +55,7 @@ export class MainMenuScene {
 
 	async show() {
 		this.advTex = createFullscreenUi('MainMenuUi', this.scene);
-		// TEST
+		// TODO
 		const { videoTexture, backgroundLayer } = createBackgroundVideo(
 			this.scene,
 		);
@@ -69,7 +69,7 @@ export class MainMenuScene {
 	dispose() {
 		this.unsubscribeLocale?.();
 		this.advTex.dispose();
-		//TEST
+		//TODO
 		this.videoTexture.dispose();
 		this.backgroundLayer.dispose();
 		//
@@ -200,7 +200,7 @@ export class MainMenuScene {
 	}
 }
 
-//TEST
+//TODO
 function createBackgroundVideo(scene: Scene) {
 	const videoTexture = new BABYLON.VideoTexture(
 		'menuTrailer',

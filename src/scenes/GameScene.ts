@@ -538,7 +538,7 @@ export class GameScene {
 		const canvas = this.engine.getRenderingCanvas();
 		if (!canvas) return;
 		try {
-			canvas.requestPointerLock();
+			if (document.hasFocus()) canvas.requestPointerLock();
 		} catch (error) {
 			console.log('Pointer Lock unavailable', error);
 		}
