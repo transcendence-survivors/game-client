@@ -89,7 +89,6 @@ export class LobbyScene {
 			await SceneManager.toGame(this.room, this.room.state.seed);
 			return true;
 		} catch (error) {
-			console.warn('Reconnection failed', error?.message, error?.code);
 			sessionStorage.removeItem(STORAGE_COLYSEUS_TOKEN_ID_STR);
 			sessionStorage.removeItem(STORAGE_COLYSEUS_ROOM_ID_STR);
 			return false;

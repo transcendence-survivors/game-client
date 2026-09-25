@@ -126,6 +126,10 @@ export class GameScene {
 			const music = this.track(createGameMusic());
 			this.createCamera();
 
+			room.onMessage('initSeq', (lastProcessedSeq: number) => {
+				this.seq = lastProcessedSeq;
+			});
+
 			this.playerAssets = this.track(new ModelAssetLibrary(this.scene));
 			this.defer(() => room.leave());
 			this.server = this.track(
@@ -510,10 +514,15 @@ export class GameScene {
 			'localPlayer',
 		);
 		const model = result.root;
+		const room = this.server.getRoom();
+		const existingPlayer = room.state.players.get(room.sessionId);
 		const spawn = this.server.getLocalSpawn();
-		const startX = spawn?.x ?? 0;
-		const startZ = spawn?.z ?? 0;
-		const startY = spawn?.y ?? this.mapGen.getGroundHeight(startX, startZ);
+		const startX = existingPlayer?.x ?? spawn?.x ?? 0;
+		const startZ = existingPlayer?.z ?? spawn?.z ?? 0;
+		const startY =
+			existingPlayer?.y ??
+			spawn?.y ??
+			this.mapGen.getGroundHeight(startX, startZ);
 		model.position = new BABYLON.Vector3(startX, startY, startZ);
 		model.scaling = new BABYLON.Vector3(1, 1, 1);
 		model.isVisible = true;
