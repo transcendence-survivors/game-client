@@ -27,11 +27,6 @@ export class MainMenuScene {
 	private languageOptionsOpen = false;
 	private unsubscribeLocale?: () => void;
 
-	//TODO
-	private backgroundLayer!: BABYLON.Layer;
-	private videoTexture!: BABYLON.VideoTexture;
-	//
-
 	constructor(engine: Engine) {
 		this.engine = engine;
 		this.scene = new BABYLON.Scene(this.engine);
@@ -55,13 +50,6 @@ export class MainMenuScene {
 
 	async show() {
 		this.advTex = createFullscreenUi('MainMenuUi', this.scene);
-		// TODO
-		const { videoTexture, backgroundLayer } = createBackgroundVideo(
-			this.scene,
-		);
-		this.videoTexture = videoTexture;
-		this.backgroundLayer = backgroundLayer;
-		//
 		await this.advTex.parseFromURLAsync(guiImports.main);
 		this.linkControls();
 	}
@@ -69,10 +57,6 @@ export class MainMenuScene {
 	dispose() {
 		this.unsubscribeLocale?.();
 		this.advTex.dispose();
-		//TODO
-		this.videoTexture.dispose();
-		this.backgroundLayer.dispose();
-		//
 		this.scene.dispose();
 	}
 
@@ -199,27 +183,3 @@ export class MainMenuScene {
 		});
 	}
 }
-
-//TODO
-function createBackgroundVideo(scene: Scene) {
-	const videoTexture = new BABYLON.VideoTexture(
-		'menuTrailer',
-		guiImports.testVideo,
-		scene,
-		true,
-		false,
-		BABYLON.VideoTexture.TRILINEAR_SAMPLINGMODE,
-		{ autoPlay: true, muted: true, loop: true, autoUpdateTexture: true },
-	);
-
-	const backgroundLayer = new BABYLON.Layer(
-		'menuBackground',
-		null,
-		scene,
-		true,
-	);
-	backgroundLayer.texture = videoTexture;
-
-	return { videoTexture, backgroundLayer };
-}
-//

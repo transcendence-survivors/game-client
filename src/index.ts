@@ -1,5 +1,6 @@
 import * as BABYLON from '@babylonjs/core';
 import { SceneManager } from './scenes/SceneManager';
+import type { GameLocale } from './i18n';
 
 let engine: BABYLON.Engine | null = null;
 let handleResize: (() => void) | null = null;
@@ -8,11 +9,12 @@ export async function initGame(
 	canvas: HTMLCanvasElement,
 	username: string,
 	userId: string,
+	locale: GameLocale,
 	avatarUrl?: string,
 ) {
 	engine = new BABYLON.Engine(canvas, true);
-	SceneManager.init(engine, username, userId, avatarUrl);
-	await SceneManager.toMainMenu();
+	SceneManager.init(engine, username, userId, locale, avatarUrl);
+	await SceneManager.toLobby();
 	SceneManager.start();
 
 	handleResize = () => engine?.resize();

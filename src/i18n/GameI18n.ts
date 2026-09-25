@@ -13,8 +13,6 @@ import {
 	type TranslationParams,
 } from './types';
 
-const STORAGE_KEY = 'transcendence-survivors.game-locale';
-
 const catalogs = { fr, en, de, es, che, it } as const satisfies Record<
 	GameLocale,
 	TranslationCatalog
@@ -22,26 +20,18 @@ const catalogs = { fr, en, de, es, che, it } as const satisfies Record<
 
 type LocaleListener = (locale: GameLocale) => void;
 
-const isGameLocale = (value: unknown): value is GameLocale =>
-	typeof value === 'string' &&
-	(GAME_LOCALES as readonly string[]).includes(value);
-
 export class GameI18n {
 	private locale: GameLocale = DEFAULT_GAME_LOCALE;
-	private hydrated = false;
 	private readonly listeners = new Set<LocaleListener>();
 
 	getLocale(): GameLocale {
-		this.hydrate();
 		return this.locale;
 	}
 
 	setLocale(locale: GameLocale): void {
-		this.hydrate();
 		if (locale === this.locale) return;
 
 		this.locale = locale;
-		this.persist(locale);
 		for (const listener of this.listeners) listener(locale);
 	}
 
@@ -64,25 +54,6 @@ export class GameI18n {
 	subscribe(listener: LocaleListener): () => void {
 		this.listeners.add(listener);
 		return () => this.listeners.delete(listener);
-	}
-
-	private hydrate(): void {
-		if (this.hydrated) return;
-		this.hydrated = true;
-
-		try {
-			if (typeof window === 'undefined') return;
-			const storedLocale = window.localStorage.getItem(STORAGE_KEY);
-			if (isGameLocale(storedLocale)) this.locale = storedLocale;
-		} catch {}
-	}
-
-	private persist(locale: GameLocale): void {
-		try {
-			if (typeof window !== 'undefined') {
-				window.localStorage.setItem(STORAGE_KEY, locale);
-			}
-		} catch {}
 	}
 }
 

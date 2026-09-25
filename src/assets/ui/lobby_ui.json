@@ -4,7 +4,7 @@
 		"renderToIntermediateTexture": false,
 		"adaptHeightToChildren": false,
 		"adaptWidthToChildren": false,
-		"background": "#0E0E12FF",
+		"background": "#0E0E1200",
 		"delegatePickingToChildren": false,
 		"maxLayoutCycle": 3,
 		"clipChildren": true,

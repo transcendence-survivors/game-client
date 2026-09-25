@@ -1,5 +1,4 @@
 import { type Engine } from '@babylonjs/core';
-import { MainMenuScene } from './MainMenuScene';
 import { GameScene } from './GameScene';
 import { LobbyScene } from './LobbyScene';
 import * as COLYSEUS from '@colyseus/sdk';
@@ -7,6 +6,7 @@ import type { GameState } from '../../../shared-package/src';
 import { EndingScreen } from './EndingScreen';
 import { WaitingScreen } from './WaitingScreen';
 import type { UserInfos } from '../../../shared-package/src/utils/Types';
+import { gameI18n, type GameLocale } from '../i18n';
 
 export interface ManagedScene {
 	render(): void;
@@ -28,16 +28,14 @@ export class SceneManager {
 		engine: Engine,
 		username: string,
 		userId: string,
+		locale: GameLocale,
 		avatarUrl?: string,
 	) {
 		SceneManager.engine = engine;
 		this.user.username = username;
 		this.user.userId = userId;
+		gameI18n.setLocale(locale);
 		this.user.avatarUrl = avatarUrl;
-	}
-
-	static toMainMenu() {
-		return SceneManager.set(new MainMenuScene(SceneManager.engine));
 	}
 
 	static toGame(room: COLYSEUS.Room<GameState>, seed: number) {

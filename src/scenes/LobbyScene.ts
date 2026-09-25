@@ -5,7 +5,7 @@ import { NetworkManager } from '../server/NetworkManager';
 import { SceneManager } from '../scenes/SceneManager';
 import { normalizeRoomName, type GameState } from '@transcendence/game-shared';
 import { createFullscreenUi, getGuiControls, guiImports } from '../assets/ui';
-import { gameI18n } from '../i18n';
+import { GAME_LOCALES, gameI18n, type GameLocale } from '../i18n';
 import { setInputPlaceholder, setText } from '../i18n/gui';
 import type { UserInfos } from '../../../shared-package/src/utils/Types';
 
@@ -26,6 +26,12 @@ export class LobbyScene {
 	private engine: BABYLON.Engine;
 	private room!: COLYSEUS.Room<GameState>;
 	public readonly ready: Promise<void>;
+	//TODO
+	private backgroundLayer!: BABYLON.Layer;
+	private videoTexture!: BABYLON.VideoTexture;
+	//
+
+	private reconnecting: boolean = false;
 
 	constructor(engine: BABYLON.Engine, user: UserInfos) {
 		this.engine = engine;
@@ -40,32 +46,36 @@ export class LobbyScene {
 	}
 
 	async show() {
+		if (await this.tryReconnect()) return;
 		this.advTex = createFullscreenUi('LobbyUi', this.scene);
+		// TODO
+		const { videoTexture, backgroundLayer } = createBackgroundVideo(
+			this.scene,
+		);
+		this.videoTexture = videoTexture;
+		this.backgroundLayer = backgroundLayer;
+		//
 		await this.advTex.parseFromURLAsync(guiImports.lobby);
 		this.applyTranslations();
 		this.linkControls();
-		await this.tryReconnect();
 	}
 
 	dispose() {
-		this.advTex.dispose();
-		this.scene.dispose();
+		if (this.advTex) this.advTex.dispose();
+		//TODO
+		if (this.videoTexture) this.videoTexture.dispose();
+		if (this.backgroundLayer) this.backgroundLayer.dispose();
+		//
+		if (this.scene) this.scene.dispose();
 	}
 
 	private async tryReconnect() {
-		const token = sessionStorage.getItem(STORAGE_COLYSEUS_TOKEN_ID_STR);
-		if (!token) return false;
-
-		const { status } = getGuiControls<LobbyControls>(this.advTex, {
-			input: 'RoomNameInput',
-			createButton: 'ButtonCreate',
-			joinButton: 'ButtonJoin',
-			status: 'StatusText',
-		});
-
-		status.text = gameI18n.t('lobby.joiningRoom');
+		if (this.reconnecting) return false;
+		this.reconnecting = true;
 
 		try {
+			const token = sessionStorage.getItem(STORAGE_COLYSEUS_TOKEN_ID_STR);
+			if (!token) return false;
 			this.room = await this.network.getClient().reconnect(token);
 			sessionStorage.setItem(
 				STORAGE_COLYSEUS_TOKEN_ID_STR,
@@ -79,11 +89,12 @@ export class LobbyScene {
 			await SceneManager.toGame(this.room, this.room.state.seed);
 			return true;
 		} catch (error) {
-			console.warn('Reconnection failed', error);
+			console.warn('Reconnection failed', error?.message, error?.code);
 			sessionStorage.removeItem(STORAGE_COLYSEUS_TOKEN_ID_STR);
 			sessionStorage.removeItem(STORAGE_COLYSEUS_ROOM_ID_STR);
-			status.text = '';
 			return false;
+		} finally {
+			this.reconnecting = false;
 		}
 	}
 
@@ -175,3 +186,27 @@ export class LobbyScene {
 		);
 	}
 }
+
+//TODO
+function createBackgroundVideo(scene: BABYLON.Scene) {
+	const videoTexture = new BABYLON.VideoTexture(
+		'menuTrailer',
+		guiImports.testVideo,
+		scene,
+		true,
+		false,
+		BABYLON.VideoTexture.TRILINEAR_SAMPLINGMODE,
+		{ autoPlay: true, muted: true, loop: true, autoUpdateTexture: true },
+	);
+
+	const backgroundLayer = new BABYLON.Layer(
+		'menuBackground',
+		null,
+		scene,
+		true,
+	);
+	backgroundLayer.texture = videoTexture;
+
+	return { videoTexture, backgroundLayer };
+}
+//
