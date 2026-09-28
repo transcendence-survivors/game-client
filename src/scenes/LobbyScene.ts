@@ -26,10 +26,9 @@ export class LobbyScene {
 	private engine: BABYLON.Engine;
 	private room!: COLYSEUS.Room<GameState>;
 	public readonly ready: Promise<void>;
-	//TODO
+
 	private backgroundLayer!: BABYLON.Layer;
 	private videoTexture!: BABYLON.VideoTexture;
-	//
 
 	private reconnecting: boolean = false;
 
@@ -48,13 +47,11 @@ export class LobbyScene {
 	async show() {
 		if (await this.tryReconnect()) return;
 		this.advTex = createFullscreenUi('LobbyUi', this.scene);
-		// TODO
 		const { videoTexture, backgroundLayer } = createBackgroundVideo(
 			this.scene,
 		);
 		this.videoTexture = videoTexture;
 		this.backgroundLayer = backgroundLayer;
-		//
 		await this.advTex.parseFromURLAsync(guiImports.lobby);
 		this.applyTranslations();
 		this.linkControls();
@@ -62,10 +59,8 @@ export class LobbyScene {
 
 	dispose() {
 		if (this.advTex) this.advTex.dispose();
-		//TODO
 		if (this.videoTexture) this.videoTexture.dispose();
 		if (this.backgroundLayer) this.backgroundLayer.dispose();
-		//
 		if (this.scene) this.scene.dispose();
 	}
 
@@ -186,7 +181,6 @@ export class LobbyScene {
 	}
 }
 
-//TODO
 function createBackgroundVideo(scene: BABYLON.Scene) {
 	const videoTexture = new BABYLON.VideoTexture(
 		'menuTrailer',
@@ -208,4 +202,3 @@ function createBackgroundVideo(scene: BABYLON.Scene) {
 
 	return { videoTexture, backgroundLayer };
 }
-//
