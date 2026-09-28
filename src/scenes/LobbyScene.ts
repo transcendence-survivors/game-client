@@ -90,6 +90,8 @@ export class LobbyScene {
 			await SceneManager.toGame(this.room, this.room.state.seed);
 			return true;
 		} catch (error) {
+			console.warn('reconnect failed', error);
+			this?.room.leave(false);
 			sessionStorage.removeItem(STORAGE_COLYSEUS_TOKEN_ID_STR);
 			sessionStorage.removeItem(STORAGE_COLYSEUS_ROOM_ID_STR);
 			return false;
@@ -118,7 +120,7 @@ export class LobbyScene {
 		});
 
 		profileDisplayname.text = this.user.displayName;
-		profileUsername.text = this.user.username;
+		profileUsername.text = `@${this.user.username}`;
 		profileImage.source = this.user.avatarUrl || iconsImport.ppPh;
 
 		const setStatus = (text: string) => {
