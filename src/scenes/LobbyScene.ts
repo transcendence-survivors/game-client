@@ -5,15 +5,19 @@ import { NetworkManager } from '../server/NetworkManager';
 import { SceneManager } from '../scenes/SceneManager';
 import { normalizeRoomName, type GameState } from '@transcendence/game-shared';
 import { createFullscreenUi, getGuiControls, guiImports } from '../assets/ui';
-import { GAME_LOCALES, gameI18n, type GameLocale } from '../i18n';
+import { gameI18n } from '../i18n';
 import { setInputPlaceholder, setText } from '../i18n/gui';
 import type { UserInfos } from '../../../shared-package/src/utils/Types';
+import { iconsImport } from '../assets/icons';
 
 interface LobbyControls {
 	input: GUI.InputText;
 	createButton: GUI.Button;
 	joinButton: GUI.Button;
 	status: GUI.TextBlock;
+	profileImage: GUI.Image;
+	profileUsername: GUI.TextBlock;
+	profileDisplayname: GUI.TextBlock;
 }
 
 export const STORAGE_COLYSEUS_TOKEN_ID_STR = 'colyseus_reconnection_token';
@@ -31,10 +35,12 @@ export class LobbyScene {
 	private videoTexture!: BABYLON.VideoTexture;
 
 	private reconnecting: boolean = false;
+	private user: UserInfos;
 
 	constructor(engine: BABYLON.Engine, user: UserInfos) {
 		this.engine = engine;
 		this.network = new NetworkManager(user);
+		this.user = user;
 		this.scene = new BABYLON.Scene(this.engine);
 		new BABYLON.FreeCamera('LobbyCam', BABYLON.Vector3.Zero(), this.scene);
 		this.ready = this.show();
@@ -93,13 +99,27 @@ export class LobbyScene {
 	}
 
 	private linkControls() {
-		const { input, createButton, joinButton, status } =
-			getGuiControls<LobbyControls>(this.advTex, {
-				input: 'RoomNameInput',
-				createButton: 'ButtonCreate',
-				joinButton: 'ButtonJoin',
-				status: 'StatusText',
-			});
+		const {
+			input,
+			createButton,
+			joinButton,
+			status,
+			profileImage,
+			profileDisplayname,
+			profileUsername,
+		} = getGuiControls<LobbyControls>(this.advTex, {
+			input: 'RoomNameInput',
+			createButton: 'ButtonCreate',
+			joinButton: 'ButtonJoin',
+			status: 'StatusText',
+			profileImage: 'ProfileImage',
+			profileUsername: 'ProfileUsername',
+			profileDisplayname: 'ProfileDisplayName',
+		});
+
+		profileDisplayname.text = this.user.displayName;
+		profileUsername.text = this.user.username;
+		profileImage.source = this.user.avatarUrl || iconsImport.ppPh;
 
 		const setStatus = (text: string) => {
 			status.text = text;

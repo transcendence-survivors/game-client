@@ -10,10 +10,11 @@ export async function initGame(
 	username: string,
 	userId: string,
 	locale: GameLocale,
+	displayName: string,
 	avatarUrl?: string,
 ) {
 	engine = new BABYLON.Engine(canvas, true);
-	SceneManager.init(engine, username, userId, locale, avatarUrl);
+	SceneManager.init(engine, username, userId, locale, displayName, avatarUrl);
 	await SceneManager.toLobby();
 	SceneManager.start();
 

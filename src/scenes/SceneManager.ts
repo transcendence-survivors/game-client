@@ -22,6 +22,7 @@ export class SceneManager {
 		username: '',
 		userId: '',
 		avatarUrl: '',
+		displayName: '',
 	};
 
 	static init(
@@ -29,11 +30,13 @@ export class SceneManager {
 		username: string,
 		userId: string,
 		locale: GameLocale,
+		displayName: string,
 		avatarUrl?: string,
 	) {
 		SceneManager.engine = engine;
 		this.user.username = username;
 		this.user.userId = userId;
+		this.user.displayName = displayName;
 		gameI18n.setLocale(locale);
 		this.user.avatarUrl = avatarUrl;
 	}
