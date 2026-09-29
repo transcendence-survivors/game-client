@@ -1,7 +1,12 @@
 import * as BABYLON from '@babylonjs/core';
 import * as GUI from '@babylonjs/gui';
 import * as COLYSEUS from '@colyseus/sdk';
-import { NetworkManager } from '../server/NetworkManager';
+import {
+	clearStoredRoom,
+	NetworkManager,
+	STORAGE_COLYSEUS_ROOM_ID_STR,
+	STORAGE_COLYSEUS_TOKEN_ID_STR,
+} from '../server/NetworkManager';
 import { SceneManager } from '../scenes/SceneManager';
 import { normalizeRoomName, type GameState } from '@transcendence/game-shared';
 import { createFullscreenUi, getGuiControls, guiImports } from '../assets/ui';
@@ -19,9 +24,6 @@ interface LobbyControls {
 	profileUsername: GUI.TextBlock;
 	profileDisplayname: GUI.TextBlock;
 }
-
-export const STORAGE_COLYSEUS_TOKEN_ID_STR = 'colyseus_reconnection_token';
-export const STORAGE_COLYSEUS_ROOM_ID_STR = 'colyseus_room_id';
 
 export class LobbyScene {
 	private scene: BABYLON.Scene;
@@ -70,30 +72,29 @@ export class LobbyScene {
 		if (this.scene) this.scene.dispose();
 	}
 
+	private async waitForState(room: COLYSEUS.Room<GameState>) {
+		return new Promise<void>((resolve) => {
+			if (room.state?.seed) return resolve();
+			room.onStateChange.once(() => resolve());
+		});
+	}
+
 	private async tryReconnect() {
 		if (this.reconnecting) return false;
 		this.reconnecting = true;
+		console.log('Reconnecting');
 
 		try {
 			const token = sessionStorage.getItem(STORAGE_COLYSEUS_TOKEN_ID_STR);
 			if (!token) return false;
-			this.room = await this.network.getClient().reconnect(token);
-			sessionStorage.setItem(
-				STORAGE_COLYSEUS_TOKEN_ID_STR,
-				this.room.reconnectionToken,
-			);
-			sessionStorage.setItem(
-				STORAGE_COLYSEUS_ROOM_ID_STR,
-				this.room.roomId,
-			);
-
+			console.log(`Trying to reconect using ${token}`);
+			this.room = await this.network.reconnect(token);
+			await this.waitForState(this.room);
 			await SceneManager.toGame(this.room, this.room.state.seed);
 			return true;
 		} catch (error) {
 			console.warn('reconnect failed', error);
-			this?.room.leave(false);
-			sessionStorage.removeItem(STORAGE_COLYSEUS_TOKEN_ID_STR);
-			sessionStorage.removeItem(STORAGE_COLYSEUS_ROOM_ID_STR);
+			clearStoredRoom();
 			return false;
 		} finally {
 			this.reconnecting = false;
@@ -153,14 +154,6 @@ export class LobbyScene {
 				this.room = create
 					? await this.network.createRoom(roomName)
 					: await this.network.joinRoomByName(roomName);
-				sessionStorage.setItem(
-					STORAGE_COLYSEUS_TOKEN_ID_STR,
-					this.room.reconnectionToken,
-				);
-				sessionStorage.setItem(
-					STORAGE_COLYSEUS_ROOM_ID_STR,
-					this.room.roomId,
-				);
 				setStatus(
 					create
 						? gameI18n.t('lobby.roomCreated', { roomName })

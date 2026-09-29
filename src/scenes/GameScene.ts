@@ -42,6 +42,7 @@ import { NetworkInputCadence } from '../performance/NetworkInputCadence';
 import { LevelUpShaderEffect } from '../effects/LevelUpShaderEffect';
 import { createGameMusic } from '../audio/GameMusic';
 import { MobileControls, type MobileAction } from '../hud/MobileControls';
+import { watchInitSeq } from '../server/NetworkManager';
 
 const CAMERA_NEAR = 0.1;
 const CAMERA_FAR = 600;
@@ -126,9 +127,13 @@ export class GameScene {
 			const music = this.track(createGameMusic());
 			this.createCamera();
 
-			room.onMessage('initSeq', (lastProcessedSeq: number) => {
-				this.seq = lastProcessedSeq;
-			});
+			const me = room.state.players.get(room.sessionId);
+			if (me) this.seq = me.lastProcessedSeq;
+			this.defer(
+				watchInitSeq(room, (lastProcessedSeq) => {
+					this.seq = Math.max(this.seq, lastProcessedSeq);
+				}),
+			);
 
 			this.playerAssets = this.track(new ModelAssetLibrary(this.scene));
 			this.defer(() => room.leave());

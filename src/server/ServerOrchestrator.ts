@@ -32,7 +32,7 @@ import { CleanupBag, CleanupRegistry } from '../CleanupBag';
 import {
 	STORAGE_COLYSEUS_ROOM_ID_STR,
 	STORAGE_COLYSEUS_TOKEN_ID_STR,
-} from '../scenes/LobbyScene';
+} from '../server/NetworkManager';
 
 class RemotePlayerView {
 	readonly mesh: BABYLON.AbstractMesh;

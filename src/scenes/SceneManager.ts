@@ -42,6 +42,8 @@ export class SceneManager {
 	}
 
 	static toGame(room: COLYSEUS.Room<GameState>, seed: number) {
+		console.log(`SUUUUUUUUUUUU ${seed}`);
+		console.log(`SUUUUUUUUUUUU ${room.state.seed}`);
 		return SceneManager.set(new GameScene(this.engine, room, seed));
 	}
 
