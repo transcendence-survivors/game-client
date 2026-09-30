@@ -883,6 +883,7 @@ export class Hud {
 		this.tomesDirty = false;
 		const { tomeCountText, tomeSlots } = this.controls;
 		const { tomeLevels } = player.stats;
+		if (!tomeLevels) return;
 		let slotIndex = 0;
 		tomeLevels.forEach((level, tomeId) => {
 			const slot = tomeSlots[slotIndex++];
