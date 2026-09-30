@@ -19,7 +19,13 @@ interface SettingsControls {
 	buttonReset: GUI.Button;
 }
 
-type KeyButtons = Record<keyof KeyBindings, GUI.Button>;
+type RebindAction = Exclude<keyof KeyBindings, 'fov'>;
+
+const REBIND_ACTIONS = KEY_ACTIONS.filter(
+	(action): action is RebindAction => action !== 'fov',
+);
+
+type KeyButtons = Record<RebindAction, GUI.Button>;
 
 const KEY_BUTTON_NAMES: { [K in keyof KeyBindings]: string } = {
 	forward: 'Key_Forward',
@@ -29,6 +35,7 @@ const KEY_BUTTON_NAMES: { [K in keyof KeyBindings]: string } = {
 	jump: 'Key_Jump',
 	stats: 'Key_Stats',
 	revive: 'Key_Revive',
+	fov: 'FovSlider',
 };
 
 export class SettingsMenuRender {
@@ -38,7 +45,8 @@ export class SettingsMenuRender {
 	private readonly camera: BABYLON.ArcRotateCamera;
 	private keybinds: KeyBindings;
 	private keyButtons!: KeyButtons;
-	private awaitingBindFor: keyof KeyBindings | null = null;
+	private awaitingBindFor: RebindAction | null = null;
+	private fovSlider!: GUI.Slider;
 
 	constructor(scene: Scene, camera: BABYLON.ArcRotateCamera) {
 		this.scene = scene;
@@ -88,11 +96,15 @@ export class SettingsMenuRender {
 				return { ...DEFAULT_KEY_BINDINGS };
 
 			const result = { ...DEFAULT_KEY_BINDINGS };
-			for (const action of KEY_ACTIONS) {
+			for (const action of REBIND_ACTIONS) {
 				const value = (parsed as Record<string, unknown>)[action];
 				if (typeof value === 'string' && value.length > 0) {
 					result[action] = value;
 				}
+			}
+			const fov = Number((parsed as Record<string, unknown>).fov);
+			if (Number.isFinite(fov) && fov > 0) {
+				result.fov = String(fov);
 			}
 			return result;
 		} catch (error) {
@@ -105,9 +117,10 @@ export class SettingsMenuRender {
 		const defaults = this.resetKeybindings();
 		Object.assign(this.keybinds, defaults);
 
-		for (const action of KEY_ACTIONS) {
+		for (const action of REBIND_ACTIONS) {
 			this.setButtonLabel(this.keyButtons[action], this.keybinds[action]);
 		}
+		this.fovSlider.value = Number(this.keybinds.fov);
 	}
 
 	dispose() {
@@ -148,17 +161,26 @@ export class SettingsMenuRender {
 			KEY_BUTTON_NAMES,
 		);
 
+		this.fovSlider = fovSlider;
+
+		const initialFov = Number(this.keybinds.fov);
+		fovSlider.value = initialFov;
+		fovValue.text = Math.round(fovSlider.value) + '°';
+		this.camera.fov = BABYLON.Tools.ToRadians(fovSlider.value);
+
 		fovSlider.onValueChangedObservable.add((value) => {
 			const rounded = Math.round(value);
 			fovValue.text = rounded + '°';
+			this.keybinds.fov = String(rounded);
 			this.camera.fov = BABYLON.Tools.ToRadians(rounded);
+			this.saveKeybindings(this.keybinds);
 		});
 
 		buttonBack.onPointerUpObservable.add(() => this.close());
 
 		buttonReset.onPointerUpObservable.add(() => this.applyReset());
 
-		for (const action of KEY_ACTIONS) {
+		for (const action of REBIND_ACTIONS) {
 			const button = this.keyButtons[action];
 			this.setButtonLabel(button, this.keybinds[action]);
 			button.onPointerUpObservable.add(() =>
@@ -168,7 +190,7 @@ export class SettingsMenuRender {
 		document.addEventListener('keydown', this.boundKeyDown);
 	}
 
-	private beginRebind(action: keyof KeyBindings, button: GUI.Button) {
+	private beginRebind(action: RebindAction, button: GUI.Button) {
 		this.awaitingBindFor = action;
 		this.setButtonLabel(button, '...');
 	}
@@ -204,13 +226,13 @@ export class SettingsMenuRender {
 		if (textBlock) textBlock.text = formatKeyLabel(label);
 	}
 
-	private cancelRebind(action: keyof KeyBindings) {
+	private cancelRebind(action: RebindAction) {
 		this.awaitingBindFor = null;
 
 		this.setButtonLabel(this.keyButtons[action], this.keybinds[action]);
 	}
 
-	private showRebindError(action: keyof KeyBindings) {
+	private showRebindError(action: RebindAction) {
 		const button = this.keyButtons[action];
 
 		this.setButtonLabel(button, gameI18n.t('settings.reserved'));

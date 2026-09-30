@@ -1,6 +1,6 @@
 import * as GUI from '@babylonjs/gui';
 import { HUD_THEME, hudText, styleHudPanel } from './HudTheme';
-import { HUD_BAR_FILL_PERCENT } from './HudConstants';
+import { HUD_BAR_FILL_PERCENT, HUD_BAR_INSET_PERCENT } from './HudConstants';
 
 const BOTTOM_PANEL_WIDTH = '250px';
 const BOTTOM_PANEL_HEIGHT = '102px';
@@ -37,7 +37,7 @@ export function createHudBar(
 	const fill = new GUI.Rectangle(`${name}Fill`);
 	fill.width = `${HUD_BAR_FILL_PERCENT}%`;
 	fill.height = '76%';
-	fill.left = '1%';
+	fill.left = HUD_BAR_INSET_PERCENT;
 	fill.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
 	fill.background = fillColor;
 	fill.thickness = 0;

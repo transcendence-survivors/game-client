@@ -540,12 +540,7 @@ export class Hud {
 		downedTitle.top = '16px';
 		downedTitle.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
 		downedPanel.addControl(downedTitle);
-		const downedHint = hudText(
-			'PlayerDownedHint',
-			'',
-			14,
-			HUD_THEME.muted,
-		);
+		const downedHint = hudText('PlayerDownedHint', '', 14, HUD_THEME.muted);
 		downedHint.height = '26px';
 		downedHint.top = '52px';
 		downedHint.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
@@ -840,7 +835,7 @@ export class Hud {
 		name.text = `${gameI18n.t('hud.boss').toUpperCase()} · ${getMonsterDisplayName(boss.kind)}`;
 		const current = boss.life.current;
 		const max = boss.life.max;
-		fill.width = hudBarWidth(current, max, 96);
+		fill.width = hudBarWidth(current, max, max);
 		text.text = `${Math.round(Math.max(0, current))} / ${Math.round(Math.max(0, max))}`;
 	}
 }

@@ -8,6 +8,7 @@ export const KEY_ACTIONS = [
 	'jump',
 	'stats',
 	'revive',
+	'fov',
 ] as const;
 
 export type KeyBindings = Record<(typeof KEY_ACTIONS)[number], string>;
@@ -20,6 +21,7 @@ export const DEFAULT_KEY_BINDINGS: Readonly<KeyBindings> = {
 	jump: ' ',
 	stats: 'c',
 	revive: 'f',
+	fov: '90',
 };
 
 export function formatKeyLabel(key: string): string {

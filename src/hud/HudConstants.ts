@@ -1,1 +1,2 @@
-export const HUD_BAR_FILL_PERCENT = 98;
+export const HUD_BAR_INSET_PERCENT = 1;
+export const HUD_BAR_FILL_PERCENT = 100 - HUD_BAR_INSET_PERCENT * 2;
