@@ -59,11 +59,10 @@ export class LobbyScene {
 		if (await this.tryReconnect()) return;
 		if (this.disposed) return;
 		this.advTex = createFullscreenUi('LobbyUi', this.scene);
-		const { videoTexture, backgroundLayer } = createBackgroundVideo(
-			this.scene,
-		);
-		this.videoTexture = videoTexture;
-		this.backgroundLayer = backgroundLayer;
+		const bg = await createBackgroundVideo(this.scene, () => this.disposed);
+		if (!bg || this.disposed) return;
+		this.videoTexture = bg.videoTexture;
+		this.backgroundLayer = bg.backgroundLayer;
 		await this.advTex.parseFromURLAsync(guiImports.lobby);
 		if (this.disposed) return;
 		this.applyTranslations();
@@ -211,15 +210,40 @@ export class LobbyScene {
 	}
 }
 
-export function createBackgroundVideo(scene: BABYLON.Scene) {
+export async function createBackgroundVideo(
+	scene: BABYLON.Scene,
+	isDisposed: () => boolean,
+) {
+	const video = document.createElement('video');
+	video.muted = true;
+	video.loop = true;
+	video.playsInline = true;
+	video.crossOrigin = 'anonymous';
+	video.src = guiImports.testVideo;
+
+	const loaded = await new Promise<boolean>((resolve) => {
+		video.addEventListener('canplay', () => resolve(true), { once: true });
+		video.addEventListener('error', () => resolve(false), { once: true });
+	});
+
+	if (!loaded || isDisposed()) {
+		video.removeAttribute('src');
+		video.load();
+		return null;
+	}
 	const videoTexture = new BABYLON.VideoTexture(
 		'menuTrailer',
-		guiImports.testVideo,
+		video,
 		scene,
 		true,
 		false,
 		BABYLON.VideoTexture.TRILINEAR_SAMPLINGMODE,
-		{ autoPlay: true, muted: true, loop: true, autoUpdateTexture: true },
+		{
+			autoPlay: true,
+			muted: true,
+			loop: true,
+			autoUpdateTexture: true,
+		},
 	);
 
 	const backgroundLayer = new BABYLON.Layer(

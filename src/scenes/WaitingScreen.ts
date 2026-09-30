@@ -47,11 +47,10 @@ export class WaitingScreen {
 		this.advTex.idealWidth = 1920;
 		this.advTex.idealHeight = 1080;
 		this.advTex.renderAtIdealSize = true;
-		const { videoTexture, backgroundLayer } = createBackgroundVideo(
-			this.scene,
-		);
-		this.videoTexture = videoTexture;
-		this.backgroundLayer = backgroundLayer;
+		const bg = await createBackgroundVideo(this.scene, () => false);
+		if (!bg) return;
+		this.videoTexture = bg.videoTexture;
+		this.backgroundLayer = bg.backgroundLayer;
 		await this.advTex.parseFromURLAsync(guiImports.waitingScreen);
 		setText(this.advTex, 'ReadyText', gameI18n.t('waiting.notReady'));
 		this.fillData();
