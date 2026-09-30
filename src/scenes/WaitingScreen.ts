@@ -8,6 +8,7 @@ import { SceneManager } from './SceneManager';
 import { gameI18n } from '../i18n';
 import { setText } from '../i18n/gui';
 import { clearStoredRoom } from '../server/NetworkManager';
+import { createBackgroundVideo } from './LobbyScene';
 
 export class WaitingScreen {
 	private advTex!: GUI.AdvancedDynamicTexture;
@@ -15,6 +16,8 @@ export class WaitingScreen {
 	private engine: BABYLON.Engine;
 	private room: COLYSEUS.Room<GameState>;
 	public readonly ready: Promise<void>;
+	private backgroundLayer!: BABYLON.Layer;
+	private videoTexture!: BABYLON.VideoTexture;
 
 	constructor(engine: BABYLON.Engine, room: COLYSEUS.Room<GameState>) {
 		this.engine = engine;
@@ -44,6 +47,11 @@ export class WaitingScreen {
 		this.advTex.idealWidth = 1920;
 		this.advTex.idealHeight = 1080;
 		this.advTex.renderAtIdealSize = true;
+		const { videoTexture, backgroundLayer } = createBackgroundVideo(
+			this.scene,
+		);
+		this.videoTexture = videoTexture;
+		this.backgroundLayer = backgroundLayer;
 		await this.advTex.parseFromURLAsync(guiImports.waitingScreen);
 		setText(this.advTex, 'ReadyText', gameI18n.t('waiting.notReady'));
 		this.fillData();
@@ -52,8 +60,10 @@ export class WaitingScreen {
 	}
 
 	dispose() {
-		this.advTex.dispose();
-		this.scene.dispose();
+		if (this.videoTexture) this.videoTexture.dispose();
+		if (this.backgroundLayer) this.backgroundLayer.dispose();
+		if (this.advTex) this.advTex.dispose();
+		if (this.scene) this.scene.dispose();
 	}
 
 	private fillData() {
