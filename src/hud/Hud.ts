@@ -115,6 +115,7 @@ export class Hud {
 	private tomesDirty = true;
 	private bossDirty = true;
 	private playerDirty = true;
+	private killsDirty = true;
 	private lastTimerSecond = Number.NaN;
 	private readonly markPlayerDirty = (): void => {
 		this.playerDirty = true;
@@ -130,6 +131,9 @@ export class Hud {
 	};
 	private readonly markBossDirty = (): void => {
 		this.bossDirty = true;
+	};
+	private readonly markKillsDirty = (): void => {
+		this.killsDirty = true;
 	};
 
 	constructor(scene: Scene, room: COLYSEUS.Room<GameState>) {
@@ -171,6 +175,14 @@ export class Hud {
 				this.markBossDirty();
 			}),
 		);
+		this.subscriptions.add(
+			callbacks.listen('totalKills', this.markKillsDirty),
+		);
+	}
+
+	private updateKillHud() {
+		this.killsDirty = false;
+		this.controls.killText.text = String(this.room.state.totalKills);
 	}
 
 	private bindPlayer(
@@ -192,7 +204,6 @@ export class Hud {
 		subscriptions.add(
 			callbacks.onChange(player.life, this.markPlayerDirty),
 			callbacks.onChange(player.experience, this.markPlayerDirty),
-			callbacks.listen(player.stats, 'killAmount', this.markPlayerDirty),
 			callbacks.listen(player, 'isDowned', this.markPlayerDirty),
 		);
 		const weaponSubscriptions = new CleanupRegistry<string>();
@@ -775,6 +786,7 @@ export class Hud {
 			this.controls.timerText.text = formatGameTime(timerSecond);
 		}
 		if (this.bossDirty) this.updateBossHealth();
+		if (this.killsDirty) this.updateKillHud();
 		const player = this.room.state.players.get(this.room.sessionId);
 		if (!player) return;
 		if (this.teamDirty) this.updateTeamHud();
@@ -795,7 +807,7 @@ export class Hud {
 		xpBar.width = hudBarWidth(xp, xpToNextLevel);
 		xpText.text = `${Math.floor(xp)} / ${Math.floor(xpToNextLevel)}`;
 		levelText.text = String(level);
-		killText.text = String(player.stats.killAmount);
+		killText.text = String(this.room.state.totalKills);
 	}
 
 	private updateTeamHud(): void {
