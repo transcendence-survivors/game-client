@@ -33,6 +33,7 @@ export class SceneManager {
 		displayName: string,
 		avatarUrl?: string,
 	) {
+		this.stop();
 		SceneManager.engine = engine;
 		this.user.username = username;
 		this.user.userId = userId;
@@ -42,8 +43,6 @@ export class SceneManager {
 	}
 
 	static toGame(room: COLYSEUS.Room<GameState>, seed: number) {
-		console.log(`SUUUUUUUUUUUU ${seed}`);
-		console.log(`SUUUUUUUUUUUU ${room.state.seed}`);
 		return SceneManager.set(new GameScene(this.engine, room, seed));
 	}
 
@@ -79,14 +78,14 @@ export class SceneManager {
 	}
 
 	static start() {
-		this.engine.runRenderLoop(() => {
-			this.currentScene?.render();
-		});
+		const engine = this.engine;
+		if (!engine || engine.isDisposed) return;
+		engine.runRenderLoop(() => this.currentScene?.render());
 	}
 
 	static stop() {
 		SceneManager.transitionSequence++;
-		this.engine.stopRenderLoop();
+		this.engine?.stopRenderLoop();
 		this.currentScene?.dispose();
 		this.currentScene = undefined;
 	}

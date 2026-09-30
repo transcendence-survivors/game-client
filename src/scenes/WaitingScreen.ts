@@ -7,6 +7,7 @@ import { guiImports } from '../assets/ui';
 import { SceneManager } from './SceneManager';
 import { gameI18n } from '../i18n';
 import { setText } from '../i18n/gui';
+import { clearStoredRoom } from '../server/NetworkManager';
 
 export class WaitingScreen {
 	private advTex!: GUI.AdvancedDynamicTexture;
@@ -44,10 +45,10 @@ export class WaitingScreen {
 		this.advTex.idealHeight = 1080;
 		this.advTex.renderAtIdealSize = true;
 		await this.advTex.parseFromURLAsync(guiImports.waitingScreen);
-		setText(this.advTex, 'Title', gameI18n.t('menu.title'));
 		setText(this.advTex, 'ReadyText', gameI18n.t('waiting.notReady'));
 		this.fillData();
-		this.connectButton();
+		this.connectButtons();
+		this.connectTitleButton();
 	}
 
 	dispose() {
@@ -124,7 +125,34 @@ export class WaitingScreen {
 			: iconsImport.notReadyIndicator;
 	}
 
-	private connectButton() {
+	private connectTitleButton() {
+		let leaving = false;
+
+		const titleIcon = this.advTex.getControlByName(
+			'TitleIcon',
+		) as GUI.TextBlock;
+
+		const titleText = this.advTex.getControlByName(
+			'Title',
+		) as GUI.TextBlock;
+
+		const goback = async () => {
+			if (leaving) return;
+			leaving = true;
+			try {
+				clearStoredRoom();
+				await this.room.leave();
+			} catch (error) {
+				console.warn('leave failed', error);
+			}
+			history.back();
+		};
+
+		titleIcon.onPointerUpObservable.add(goback);
+		titleText.onPointerUpObservable.add(goback);
+	}
+
+	private connectButtons() {
 		const button = this.advTex.getControlByName(
 			'ReadyButton',
 		) as GUI.Button;

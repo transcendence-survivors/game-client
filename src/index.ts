@@ -4,6 +4,7 @@ import type { GameLocale } from './i18n';
 
 let engine: BABYLON.Engine | null = null;
 let handleResize: (() => void) | null = null;
+let generation = 0;
 
 export async function initGame(
 	canvas: HTMLCanvasElement,
@@ -13,16 +14,24 @@ export async function initGame(
 	displayName: string,
 	avatarUrl?: string,
 ) {
-	engine = new BABYLON.Engine(canvas, true);
-	SceneManager.init(engine, username, userId, locale, displayName, avatarUrl);
-	await SceneManager.toLobby();
-	SceneManager.start();
+	destroyGame();
+	const myGen = generation;
+
+	const myEngine = new BABYLON.Engine(canvas, true);
+	engine = myEngine;
 
 	handleResize = () => engine?.resize();
 	window.addEventListener('resize', handleResize);
+
+	SceneManager.init(engine, username, userId, locale, displayName, avatarUrl);
+	await SceneManager.toLobby();
+
+	if (myGen !== generation) return;
+	SceneManager.start();
 }
 
-export async function destroyGame() {
+export function destroyGame() {
+	generation++;
 	SceneManager.stop();
 	if (handleResize) {
 		window.removeEventListener('resize', handleResize);
