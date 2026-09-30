@@ -4,7 +4,6 @@ import * as COLYSEUS from '@colyseus/sdk';
 import {
 	clearStoredRoom,
 	NetworkManager,
-	STORAGE_COLYSEUS_ROOM_ID_STR,
 	STORAGE_COLYSEUS_TOKEN_ID_STR,
 } from '../server/NetworkManager';
 import { SceneManager } from '../scenes/SceneManager';
