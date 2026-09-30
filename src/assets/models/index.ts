@@ -22,6 +22,13 @@ export const models = {
 			'./monster/ultimate/green-spiky-blob.glb',
 			import.meta.url,
 		).href,
+		orc: new URL('./monster/ultimate/orc.glb', import.meta.url).href,
+		pinkBlob: new URL('./monster/ultimate/pink-blob.glb', import.meta.url)
+			.href,
+		mushnub: new URL('./monster/ultimate/mushnub.glb', import.meta.url)
+			.href,
+		wizard: new URL('./monster/ultimate/wizard.glb', import.meta.url).href,
+		ghost: new URL('./monster/ultimate/ghost.glb', import.meta.url).href,
 		mushroomKing: new URL(
 			'./boss/ultimate/mushroom-king.glb',
 			import.meta.url,
