@@ -63,6 +63,8 @@ const de = {
 	'hud.level': 'Stufe',
 	'hud.experience': 'EP',
 	'hud.arsenal': 'Arsenal',
+	'hud.tomes': 'Folianten',
+	'hud.tomeLevel': 'St. {level}',
 	'hud.ally': 'Verbündeter {number}',
 	'hud.knockedOut': 'K. O.',
 	'hud.downed': 'Du liegst am Boden',

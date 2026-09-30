@@ -61,6 +61,8 @@ const en = {
 	'hud.level': 'Level',
 	'hud.experience': 'XP',
 	'hud.arsenal': 'Arsenal',
+	'hud.tomes': 'Tomes',
+	'hud.tomeLevel': 'Lv. {level}',
 	'hud.ally': 'Ally {number}',
 	'hud.knockedOut': 'K.O.',
 	'hud.downed': 'You are down',

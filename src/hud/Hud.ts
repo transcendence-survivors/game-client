@@ -3,11 +3,14 @@ import type { Scene } from '@babylonjs/core';
 import * as COLYSEUS from '@colyseus/sdk';
 import {
 	COMBAT_LIMITS,
+	TOME_DEFINITIONS,
+	TOME_SLOT_LIMIT,
 	WEAPON_ICONS,
 	WEAPON_KINDS,
 	type GameState,
 	type Monster,
 	type Player,
+	type TomeId,
 	type WeaponKind,
 } from '@transcendence/game-shared';
 import { createFullscreenUi } from '../assets/ui';
@@ -37,7 +40,9 @@ interface HudControls {
 	bossHealthFill: GUI.Rectangle;
 	bossHealthText: GUI.TextBlock;
 	weaponCountText: GUI.TextBlock;
-	weaponSlots: WeaponSlotControls[];
+	weaponSlots: ItemSlotControls[];
+	tomeCountText: GUI.TextBlock;
+	tomeSlots: ItemSlotControls[];
 	teamPanel: GUI.Rectangle;
 	teamCountText: GUI.TextBlock;
 	teammateSlots: TeammateSlotControls[];
@@ -47,7 +52,7 @@ interface HudControls {
 
 type StateCallbacks = ReturnType<typeof COLYSEUS.Callbacks.get<GameState>>;
 
-interface WeaponSlotControls {
+interface ItemSlotControls {
 	panel: GUI.Rectangle;
 	icon: GUI.Image;
 	name: GUI.TextBlock;
@@ -62,8 +67,24 @@ interface TeammateSlotControls {
 	healthText: GUI.TextBlock;
 }
 
+interface ItemSlotPanelControls {
+	countText: GUI.TextBlock;
+	slots: ItemSlotControls[];
+}
+
 const HUD_SCALE = 0.75;
 const BOTTOM_PANEL_OFFSET = 316;
+const COUNTER_PANEL_HEIGHT = 68;
+const COUNTER_PANEL_TOP = 15.5;
+const KILL_PANEL_WIDTH = 176;
+const TIMER_PANEL_WIDTH = 212;
+const TIMER_PANEL_LEFT = 139.5;
+const ITEM_SLOT_SPACING = 7;
+const ITEM_SLOT_ROW_WIDTH = 226;
+const WEAPON_SLOT_WIDTH = 70;
+const TOME_SLOT_WIDTH = 51;
+const EMPTY_SLOT_BACKGROUND = '#0B1417D9';
+const FILLED_SLOT_BACKGROUND = '#172326F2';
 const TEAM_HEADER_HEIGHT = 36;
 const TEAM_SLOT_HEIGHT = 44;
 const compareIds = (first: string, second: string): number =>
@@ -75,6 +96,9 @@ const WEAPON_NAME_KEYS: Readonly<Record<WeaponKind, TranslationKey>> = {
 	staff: 'weapon.staff',
 	bow: 'weapon.bow',
 };
+const TOME_ICONS = new Map(
+	TOME_DEFINITIONS.map(({ id, iconUrl }) => [id, iconUrl] as const),
+);
 
 export class Hud {
 	private readonly advTex: GUI.AdvancedDynamicTexture;
@@ -88,6 +112,7 @@ export class Hud {
 	private reviveKeyLabel = '';
 	private teamDirty = true;
 	private weaponsDirty = true;
+	private tomesDirty = true;
 	private bossDirty = true;
 	private playerDirty = true;
 	private lastTimerSecond = Number.NaN;
@@ -99,6 +124,9 @@ export class Hud {
 	};
 	private readonly markWeaponsDirty = (): void => {
 		this.weaponsDirty = true;
+	};
+	private readonly markTomesDirty = (): void => {
+		this.tomesDirty = true;
 	};
 	private readonly markBossDirty = (): void => {
 		this.bossDirty = true;
@@ -124,6 +152,7 @@ export class Hud {
 				this.playerSubscriptions.delete(sessionId);
 				if (sessionId === this.room.sessionId) {
 					this.weaponsDirty = true;
+					this.tomesDirty = true;
 					this.playerDirty = true;
 				} else this.teamDirty = true;
 			}),
@@ -180,7 +209,10 @@ export class Hud {
 				weaponSubscriptions.delete(weaponId);
 				this.markWeaponsDirty();
 			}),
+			callbacks.onChange(player.stats, 'tomeLevels', this.markTomesDirty),
+			callbacks.onRemove(player.stats, 'tomeLevels', this.markTomesDirty),
 		);
+		this.markTomesDirty();
 		this.markPlayerDirty();
 	}
 
@@ -215,39 +247,22 @@ export class Hud {
 	private buildHud(): HudControls {
 		const root = this.advTex.rootContainer;
 
-		const killPanel = new GUI.Rectangle('KillCounterPanel');
-		killPanel.width = '176px';
-		killPanel.height = '68px';
-		killPanel.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-		killPanel.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-		killPanel.left = '2px';
-		killPanel.top = '15.5px';
-		killPanel.scaleX = HUD_SCALE;
-		killPanel.scaleY = HUD_SCALE;
-		styleHudPanel(killPanel, HUD_THEME.gold);
-		root.addControl(killPanel);
-		const killLabel = hudText(
-			'KillCounterLabel',
-			gameI18n.t('hud.kills').toUpperCase(),
-			13,
-			HUD_THEME.muted,
-		);
-		killLabel.fontWeight = '600';
-		killLabel.height = '22px';
-		killLabel.top = '7px';
-		killLabel.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-		killPanel.addControl(killLabel);
-		const killText = hudText(
-			'KillCounterText',
+		const killText = this.createCounterPanel(
+			root,
+			'KillCounter',
+			gameI18n.t('hud.kills'),
 			'0',
-			28,
-			HUD_THEME.goldBright,
+			KILL_PANEL_WIDTH,
+			2,
 		);
-		killText.fontWeight = 'bold';
-		killText.height = '35px';
-		killText.top = '27px';
-		killText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-		killPanel.addControl(killText);
+		const timerText = this.createCounterPanel(
+			root,
+			'GameTimer',
+			gameI18n.t('hud.survivalTime'),
+			'00:00',
+			TIMER_PANEL_WIDTH,
+			TIMER_PANEL_LEFT,
+		);
 
 		const teamPanel = new GUI.Rectangle('NetworkTeamPanel');
 		teamPanel.width = '244px';
@@ -345,36 +360,6 @@ export class Hud {
 		);
 		addHudBarHighlight(bossBar.fill);
 
-		const timerPanel = createBottomHudPanel(
-			root,
-			'GameTimerPanel',
-			BOTTOM_PANEL_OFFSET,
-			HUD_THEME.gold,
-			HUD_SCALE,
-		);
-		const timerLabel = hudText(
-			'GameTimerLabel',
-			gameI18n.t('hud.survivalTime').toUpperCase(),
-			11,
-			HUD_THEME.gold,
-		);
-		timerLabel.fontWeight = 'bold';
-		timerLabel.height = '22px';
-		timerLabel.top = '10px';
-		timerLabel.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-		timerPanel.addControl(timerLabel);
-		const timerText = hudText(
-			'GameTimerText',
-			'00:00',
-			28,
-			HUD_THEME.goldBright,
-		);
-		timerText.fontWeight = 'bold';
-		timerText.height = '48px';
-		timerText.top = '36px';
-		timerText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-		timerPanel.addControl(timerText);
-
 		const vitalsPanel = new GUI.Rectangle('PlayerVitalsPanel');
 		vitalsPanel.width = '560px';
 		vitalsPanel.height = '102px';
@@ -458,62 +443,23 @@ export class Hud {
 		);
 		addHudBarHighlight(xpBar.fill);
 
-		const arsenalPanel = createBottomHudPanel(
+		const arsenal = this.createItemSlotPanel(
 			root,
-			'PlayerArsenalPanel',
+			'PlayerArsenal',
+			'PlayerWeaponSlot',
+			gameI18n.t('hud.arsenal'),
 			-BOTTOM_PANEL_OFFSET,
-			HUD_THEME.gold,
-			HUD_SCALE,
+			COMBAT_LIMITS.maxWeaponsPerPlayer,
+			WEAPON_SLOT_WIDTH,
 		);
-
-		const arsenalLabel = hudText(
-			'PlayerArsenalLabel',
-			gameI18n.t('hud.arsenal').toUpperCase(),
-			11,
-			HUD_THEME.gold,
-		);
-		arsenalLabel.fontWeight = 'bold';
-		arsenalLabel.width = '120px';
-		arsenalLabel.height = '20px';
-		arsenalLabel.left = '12px';
-		arsenalLabel.top = '5px';
-		arsenalLabel.horizontalAlignment =
-			GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-		arsenalLabel.textHorizontalAlignment =
-			GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-		arsenalLabel.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-		arsenalPanel.addControl(arsenalLabel);
-
-		const weaponCountText = hudText(
-			'PlayerArsenalCount',
-			`0 / ${COMBAT_LIMITS.maxWeaponsPerPlayer}`,
-			11,
-			HUD_THEME.muted,
-		);
-		weaponCountText.fontWeight = 'bold';
-		weaponCountText.width = '70px';
-		weaponCountText.height = '20px';
-		weaponCountText.left = '-12px';
-		weaponCountText.top = '5px';
-		weaponCountText.horizontalAlignment =
-			GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
-		weaponCountText.textHorizontalAlignment =
-			GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
-		weaponCountText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-		arsenalPanel.addControl(weaponCountText);
-
-		const weaponRow = new GUI.StackPanel('PlayerWeaponSlots');
-		weaponRow.isVertical = false;
-		weaponRow.spacing = 7;
-		weaponRow.width = '226px';
-		weaponRow.height = '67px';
-		weaponRow.top = '27px';
-		weaponRow.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-		arsenalPanel.addControl(weaponRow);
-
-		const weaponSlots = Array.from(
-			{ length: COMBAT_LIMITS.maxWeaponsPerPlayer },
-			(_, index) => this.createWeaponSlot(weaponRow, index),
+		const tomes = this.createItemSlotPanel(
+			root,
+			'PlayerTomes',
+			'PlayerTomeSlot',
+			gameI18n.t('hud.tomes'),
+			BOTTOM_PANEL_OFFSET,
+			TOME_SLOT_LIMIT,
+			TOME_SLOT_WIDTH,
 		);
 
 		const downedPanel = new GUI.Rectangle('PlayerDownedPanel');
@@ -558,14 +504,126 @@ export class Hud {
 			bossName,
 			bossHealthFill: bossBar.fill,
 			bossHealthText,
-			weaponCountText,
-			weaponSlots,
+			weaponCountText: arsenal.countText,
+			weaponSlots: arsenal.slots,
+			tomeCountText: tomes.countText,
+			tomeSlots: tomes.slots,
 			teamPanel,
 			teamCountText,
 			teammateSlots,
 			downedPanel,
 			downedHint,
 		};
+	}
+
+	private createCounterPanel(
+		root: GUI.Container,
+		name: string,
+		label: string,
+		value: string,
+		width: number,
+		left: number,
+	): GUI.TextBlock {
+		const panel = new GUI.Rectangle(`${name}Panel`);
+		panel.width = `${width}px`;
+		panel.height = `${COUNTER_PANEL_HEIGHT}px`;
+		panel.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+		panel.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
+		panel.left = `${left}px`;
+		panel.top = `${COUNTER_PANEL_TOP}px`;
+		panel.scaleX = HUD_SCALE;
+		panel.scaleY = HUD_SCALE;
+		styleHudPanel(panel, HUD_THEME.gold);
+		root.addControl(panel);
+		const labelText = hudText(
+			`${name}Label`,
+			label.toUpperCase(),
+			13,
+			HUD_THEME.muted,
+		);
+		labelText.fontWeight = '600';
+		labelText.height = '22px';
+		labelText.top = '7px';
+		labelText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
+		panel.addControl(labelText);
+		const valueText = hudText(
+			`${name}Text`,
+			value,
+			28,
+			HUD_THEME.goldBright,
+		);
+		valueText.fontWeight = 'bold';
+		valueText.height = '35px';
+		valueText.top = '27px';
+		valueText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
+		panel.addControl(valueText);
+		return valueText;
+	}
+
+	private createItemSlotPanel(
+		root: GUI.Container,
+		name: string,
+		slotName: string,
+		label: string,
+		offset: number,
+		capacity: number,
+		slotWidth: number,
+	): ItemSlotPanelControls {
+		const panel = createBottomHudPanel(
+			root,
+			`${name}Panel`,
+			offset,
+			HUD_THEME.gold,
+			HUD_SCALE,
+		);
+
+		const labelText = hudText(
+			`${name}Label`,
+			label.toUpperCase(),
+			11,
+			HUD_THEME.gold,
+		);
+		labelText.fontWeight = 'bold';
+		labelText.width = '120px';
+		labelText.height = '20px';
+		labelText.left = '12px';
+		labelText.top = '5px';
+		labelText.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+		labelText.textHorizontalAlignment =
+			GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+		labelText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
+		panel.addControl(labelText);
+
+		const countText = hudText(
+			`${name}Count`,
+			`0 / ${capacity}`,
+			11,
+			HUD_THEME.muted,
+		);
+		countText.fontWeight = 'bold';
+		countText.width = '70px';
+		countText.height = '20px';
+		countText.left = '-12px';
+		countText.top = '5px';
+		countText.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+		countText.textHorizontalAlignment =
+			GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+		countText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
+		panel.addControl(countText);
+
+		const row = new GUI.StackPanel(`${slotName}s`);
+		row.isVertical = false;
+		row.spacing = ITEM_SLOT_SPACING;
+		row.width = `${ITEM_SLOT_ROW_WIDTH}px`;
+		row.height = '67px';
+		row.top = '27px';
+		row.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
+		panel.addControl(row);
+
+		const slots = Array.from({ length: capacity }, (_, index) =>
+			this.createItemSlot(row, `${slotName}${index}`, slotWidth),
+		);
+		return { countText, slots };
 	}
 
 	setReviveKeyLabel(label: string): void {
@@ -650,21 +708,22 @@ export class Hud {
 		};
 	}
 
-	private createWeaponSlot(
+	private createItemSlot(
 		parent: GUI.StackPanel,
-		index: number,
-	): WeaponSlotControls {
-		const panel = new GUI.Rectangle(`PlayerWeaponSlot${index}`);
-		panel.width = '70px';
+		name: string,
+		width: number,
+	): ItemSlotControls {
+		const panel = new GUI.Rectangle(name);
+		panel.width = `${width}px`;
 		panel.height = '64px';
-		panel.background = '#0B1417D9';
+		panel.background = EMPTY_SLOT_BACKGROUND;
 		panel.color = HUD_THEME.emptyBorder;
 		panel.thickness = 1;
 		panel.cornerRadius = 7;
 		panel.isPointerBlocker = false;
 		parent.addControl(panel);
 
-		const icon = new GUI.Image(`PlayerWeaponSlot${index}Icon`);
+		const icon = new GUI.Image(`${name}Icon`);
 		icon.width = '36px';
 		icon.height = '36px';
 		icon.top = '2px';
@@ -674,24 +733,19 @@ export class Hud {
 		icon.isVisible = false;
 		panel.addControl(icon);
 
-		const name = hudText(
-			`PlayerWeaponSlot${index}Name`,
+		const label = hudText(
+			`${name}Name`,
 			gameI18n.t('hud.empty').toUpperCase(),
 			9,
 			HUD_THEME.empty,
 		);
-		name.fontWeight = 'bold';
-		name.height = '18px';
-		name.top = '42px';
-		name.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-		panel.addControl(name);
+		label.fontWeight = 'bold';
+		label.height = '18px';
+		label.top = '42px';
+		label.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
+		panel.addControl(label);
 
-		const level = hudText(
-			`PlayerWeaponSlot${index}Level`,
-			'1',
-			10,
-			HUD_THEME.goldBright,
-		);
+		const level = hudText(`${name}Level`, '1', 10, HUD_THEME.goldBright);
 		level.fontWeight = 'bold';
 		level.width = '24px';
 		level.height = '18px';
@@ -702,7 +756,7 @@ export class Hud {
 		level.isVisible = false;
 		panel.addControl(level);
 
-		return { panel, icon, name, level };
+		return { panel, icon, name: label, level };
 	}
 
 	dispose(): void {
@@ -725,6 +779,7 @@ export class Hud {
 		if (!player) return;
 		if (this.teamDirty) this.updateTeamHud();
 		if (this.weaponsDirty) this.updateWeaponHud(player);
+		if (this.tomesDirty) this.updateTomeHud(player);
 		if (this.playerDirty) this.updatePlayerHud(player);
 	}
 
@@ -794,27 +849,78 @@ export class Hud {
 	}
 
 	private updateWeaponSlot(
-		slot: WeaponSlotControls,
+		slot: ItemSlotControls,
 		kind?: WeaponKind,
 		level = 0,
 	): void {
 		if (!kind) {
-			slot.panel.color = HUD_THEME.emptyBorder;
-			slot.panel.background = '#0B1417D9';
-			slot.icon.isVisible = false;
-			slot.name.text = gameI18n.t('hud.empty').toUpperCase();
-			slot.name.color = HUD_THEME.empty;
-			slot.level.isVisible = false;
+			this.clearItemSlot(slot);
 			return;
 		}
-		slot.panel.color = HUD_THEME.gold;
-		slot.panel.background = '#172326F2';
-		slot.icon.source = iconsImport[WEAPON_ICONS[kind]];
-		slot.icon.isVisible = true;
-		slot.name.text = gameI18n.t(WEAPON_NAME_KEYS[kind]).toUpperCase();
-		slot.name.color = HUD_THEME.text;
+		this.fillItemSlot(
+			slot,
+			iconsImport[WEAPON_ICONS[kind]],
+			gameI18n.t(WEAPON_NAME_KEYS[kind]).toUpperCase(),
+			HUD_THEME.text,
+		);
 		slot.level.text = String(level);
 		slot.level.isVisible = true;
+	}
+
+	private updateTomeHud(player: Player): void {
+		this.tomesDirty = false;
+		const { tomeCountText, tomeSlots } = this.controls;
+		const { tomeLevels } = player.stats;
+		let slotIndex = 0;
+		tomeLevels.forEach((level, tomeId) => {
+			const slot = tomeSlots[slotIndex++];
+			if (slot) this.updateTomeSlot(slot, tomeId as TomeId, level);
+		});
+		for (; slotIndex < tomeSlots.length; slotIndex++)
+			this.updateTomeSlot(tomeSlots[slotIndex]!);
+		tomeCountText.text = `${tomeLevels.size} / ${TOME_SLOT_LIMIT}`;
+	}
+
+	private updateTomeSlot(
+		slot: ItemSlotControls,
+		tomeId?: TomeId,
+		level = 0,
+	): void {
+		const icon = tomeId && TOME_ICONS.get(tomeId);
+		if (!icon) {
+			this.clearItemSlot(slot);
+			return;
+		}
+		this.fillItemSlot(
+			slot,
+			iconsImport[icon],
+			gameI18n.t('hud.tomeLevel', { level }).toUpperCase(),
+			HUD_THEME.goldBright,
+		);
+		slot.level.isVisible = false;
+	}
+
+	private clearItemSlot(slot: ItemSlotControls): void {
+		slot.panel.color = HUD_THEME.emptyBorder;
+		slot.panel.background = EMPTY_SLOT_BACKGROUND;
+		slot.icon.isVisible = false;
+		slot.name.text = gameI18n.t('hud.empty').toUpperCase();
+		slot.name.color = HUD_THEME.empty;
+		slot.level.isVisible = false;
+	}
+
+	private fillItemSlot(
+		slot: ItemSlotControls,
+		iconSource: string,
+		label: string,
+		labelColor: string,
+	): void {
+		slot.panel.color = HUD_THEME.gold;
+		slot.panel.background = FILLED_SLOT_BACKGROUND;
+		slot.icon.source = iconSource;
+		slot.icon.isVisible = true;
+		slot.name.text = label;
+		slot.name.color = labelColor;
 	}
 
 	private updateBossHealth(): void {

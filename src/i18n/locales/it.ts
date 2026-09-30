@@ -63,6 +63,8 @@ const it = {
 	'hud.level': 'Livello',
 	'hud.experience': 'ESP',
 	'hud.arsenal': 'Arsenale',
+	'hud.tomes': 'Tomi',
+	'hud.tomeLevel': 'Liv. {level}',
 	'hud.ally': 'Alleato {number}',
 	'hud.knockedOut': 'K.O.',
 	'hud.downed': 'Sei a terra',

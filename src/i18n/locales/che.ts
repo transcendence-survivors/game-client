@@ -63,6 +63,8 @@ const che = {
 	'hud.level': 'Stufe',
 	'hud.experience': 'EP',
 	'hud.arsenal': 'Arsenal',
+	'hud.tomes': 'Foliante',
+	'hud.tomeLevel': 'St. {level}',
 	'hud.ally': 'Verbündete {number}',
 	'hud.knockedOut': 'K. O.',
 	'hud.downed': 'Du ligsch am Bode',
