@@ -97,7 +97,9 @@ export class LobbyScene {
 				return false;
 			}
 			await this.waitForState(this.room);
-			await SceneManager.toGame(this.room, this.room.state.seed);
+			if (this.room.state.started)
+				await SceneManager.toGame(this.room, this.room.state.seed);
+			else await SceneManager.toWaiting(this.room);
 			return true;
 		} catch (error) {
 			console.warn('reconnect failed', error);

@@ -833,9 +833,7 @@ export class Hud {
 			slot.status.color = living
 				? HUD_THEME.allyOnline
 				: HUD_THEME.allyDown;
-			slot.name.text = `${gameI18n
-				.t('hud.ally', { number: index + 1 })
-				.toUpperCase()}${living ? '' : ` · ${gameI18n.t('hud.knockedOut').toUpperCase()}`}`;
+			slot.name.text = `${teammate.username}  ${living ? '' : ` · ${gameI18n.t('hud.knockedOut').toUpperCase()}`}`;
 			slot.name.color = living ? HUD_THEME.text : HUD_THEME.boss;
 			slot.healthText.text = `${Math.round(current)} / ${Math.round(max)}`;
 			slot.healthFill.width = hudBarWidth(current, max);
