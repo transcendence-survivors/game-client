@@ -25,21 +25,25 @@ export class NetworkManager {
 	}
 
 	async createRoom(rawName: string) {
-		return persistRoom(
-			await this.client.create<GameState>(
-				GAME_ROOM_TYPE,
-				this.roomOptions(rawName),
-			),
-		);
+		try {
+			return persistRoom(
+				await this.client.create<GameState>(
+					GAME_ROOM_TYPE,
+					this.roomOptions(rawName),
+				),
+			);
+		} catch (error) {}
 	}
 
 	async joinRoomByName(rawName: string) {
-		return persistRoom(
-			await this.client.join<GameState>(
-				GAME_ROOM_TYPE,
-				this.roomOptions(rawName),
-			),
-		);
+		try {
+			return persistRoom(
+				await this.client.join<GameState>(
+					GAME_ROOM_TYPE,
+					this.roomOptions(rawName),
+				),
+			);
+		} catch (error) {}
 	}
 
 	async reconnect(token: string) {

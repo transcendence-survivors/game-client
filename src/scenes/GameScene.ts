@@ -43,6 +43,7 @@ import { LevelUpShaderEffect } from '../effects/LevelUpShaderEffect';
 import { createGameMusic } from '../audio/GameMusic';
 import { MobileControls, type MobileAction } from '../hud/MobileControls';
 import { watchInitSeq } from '../server/NetworkManager';
+import { SceneManager } from './SceneManager';
 
 const CAMERA_NEAR = 0.1;
 const CAMERA_FAR = 600;
@@ -123,6 +124,9 @@ export class GameScene {
 
 	private async init(room: COLYSEUS.Room<GameState>, seed: number) {
 		try {
+			room.onLeave(() => {
+				if (!this.disposed) SceneManager.toLobby();
+			});
 			this.scene = this.track(new BABYLON.Scene(this.engine));
 			const music = this.track(createGameMusic());
 			this.createCamera();

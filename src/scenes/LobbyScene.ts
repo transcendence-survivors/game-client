@@ -164,9 +164,12 @@ export class LobbyScene {
 				gameI18n.t(create ? 'lobby.creatingRoom' : 'lobby.joiningRoom'),
 			);
 			try {
-				this.room = create
+				const newRoom = create
 					? await this.network.createRoom(roomName)
 					: await this.network.joinRoomByName(roomName);
+				if (newRoom) {
+					this.room = newRoom;
+				} else throw new Error('Could not find the room');
 				setStatus(
 					create
 						? gameI18n.t('lobby.roomCreated', { roomName })
