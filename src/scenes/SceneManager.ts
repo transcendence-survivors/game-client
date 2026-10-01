@@ -24,6 +24,7 @@ export class SceneManager {
 		avatarUrl: '',
 		displayName: '',
 	};
+	private static gameSocketUrl: string;
 
 	static init(
 		engine: Engine,
@@ -31,6 +32,7 @@ export class SceneManager {
 		userId: string,
 		locale: GameLocale,
 		displayName: string,
+		gameSocketUrl: string,
 		avatarUrl?: string,
 	) {
 		this.stop();
@@ -38,6 +40,7 @@ export class SceneManager {
 		this.user.username = username;
 		this.user.userId = userId;
 		this.user.displayName = displayName;
+		this.gameSocketUrl = gameSocketUrl;
 		gameI18n.setLocale(locale);
 		this.user.avatarUrl = avatarUrl;
 	}
@@ -51,7 +54,9 @@ export class SceneManager {
 	}
 
 	static toLobby() {
-		return SceneManager.set(new LobbyScene(this.engine, this.user));
+		return SceneManager.set(
+			new LobbyScene(this.engine, this.user, this.gameSocketUrl),
+		);
 	}
 
 	static toEndScreen(room: COLYSEUS.Room<GameState>) {
