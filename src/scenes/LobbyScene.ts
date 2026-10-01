@@ -42,9 +42,9 @@ export class LobbyScene {
 
 	private disposed = false;
 
-	constructor(engine: BABYLON.Engine, user: UserInfos) {
+	constructor(engine: BABYLON.Engine, user: UserInfos, gameSocketUrl: string) {
 		this.engine = engine;
-		this.network = new NetworkManager(user);
+		this.network = new NetworkManager(user, gameSocketUrl);
 		this.user = user;
 		this.scene = new BABYLON.Scene(this.engine);
 		new BABYLON.FreeCamera('LobbyCam', BABYLON.Vector3.Zero(), this.scene);

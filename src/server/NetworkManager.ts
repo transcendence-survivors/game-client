@@ -14,10 +14,9 @@ export class NetworkManager {
 	private readonly client: Client;
 	private readonly user: UserInfos;
 
-	constructor(user: UserInfos) {
-		const host = window.location.hostname;
+	constructor(user: UserInfos, gameSocketUrl: string) {
 		this.user = user;
-		this.client = new Client(`ws://${host}:4000`);
+		this.client = new Client(gameSocketUrl);
 	}
 
 	getClient() {

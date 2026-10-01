@@ -12,6 +12,7 @@ export async function initGame(
 	userId: string,
 	locale: GameLocale,
 	displayName: string,
+	gameSocketUrl: string,
 	avatarUrl?: string,
 ) {
 	destroyGame();
@@ -23,7 +24,15 @@ export async function initGame(
 	handleResize = () => engine?.resize();
 	window.addEventListener('resize', handleResize);
 
-	SceneManager.init(engine, username, userId, locale, displayName, avatarUrl);
+	SceneManager.init(
+		engine,
+		username,
+		userId,
+		locale,
+		displayName,
+		gameSocketUrl,
+		avatarUrl,
+	);
 	await SceneManager.toLobby();
 
 	if (myGen !== generation) return;
