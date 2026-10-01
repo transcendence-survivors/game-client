@@ -952,7 +952,7 @@ export class Hud {
 		name.text = `${gameI18n.t('hud.boss').toUpperCase()} · ${getMonsterDisplayName(boss.kind)}`;
 		const current = boss.life.current;
 		const max = boss.life.max;
-		fill.width = hudBarWidth(current, max, max);
+		fill.width = hudBarWidth(current, max);
 		text.text = `${Math.round(Math.max(0, current))} / ${Math.round(Math.max(0, max))}`;
 	}
 }
