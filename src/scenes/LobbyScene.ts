@@ -4,6 +4,7 @@ import * as COLYSEUS from '@colyseus/sdk';
 import {
 	clearStoredRoom,
 	NetworkManager,
+	STORAGE_COLYSEUS_ROOM_ID_STR,
 	STORAGE_COLYSEUS_TOKEN_ID_STR,
 } from '../server/NetworkManager';
 import { SceneManager } from '../scenes/SceneManager';
@@ -42,7 +43,11 @@ export class LobbyScene {
 
 	private disposed = false;
 
-	constructor(engine: BABYLON.Engine, user: UserInfos, gameSocketUrl: string) {
+	constructor(
+		engine: BABYLON.Engine,
+		user: UserInfos,
+		gameSocketUrl: string,
+	) {
 		this.engine = engine;
 		this.network = new NetworkManager(user, gameSocketUrl);
 		this.user = user;
@@ -56,6 +61,13 @@ export class LobbyScene {
 	}
 
 	async show() {
+		if (await isDuplicateTab()) {
+			console.log('SUUUUUUUUUU');
+			sessionStorage.removeItem(STORAGE_COLYSEUS_TOKEN_ID_STR);
+			sessionStorage.removeItem(STORAGE_COLYSEUS_ROOM_ID_STR);
+			SceneManager.toLobby();
+			return;
+		}
 		if (await this.tryReconnect()) return;
 		if (this.disposed) return;
 		this.advTex = createFullscreenUi('LobbyUi', this.scene);
@@ -213,6 +225,52 @@ export class LobbyScene {
 			gameI18n.t('lobby.roomNamePlaceholder'),
 		);
 	}
+}
+
+const TAB_CHANNEL = 'transcendence-game-tab';
+const PING_TIMEOUT_MS = 300;
+
+const tabId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+const startedAt = Date.now();
+
+let channel: BroadcastChannel | null = null;
+let duplicate = false;
+let olderTabSeen = false;
+
+function ensureChannel() {
+	if (channel || typeof BroadcastChannel === 'undefined') return;
+	channel = new BroadcastChannel(TAB_CHANNEL);
+
+	channel.onmessage = (e) => {
+		const { type, from, startedAt: otherStart } = e.data;
+		if (from === tabId) return;
+
+		if (type === 'ping') {
+			if (!duplicate)
+				channel?.postMessage({ type: 'pong', from: tabId, startedAt });
+		} else if (type === 'pong') {
+			if (
+				otherStart < startedAt ||
+				(otherStart === startedAt && from < tabId)
+			)
+				olderTabSeen = true;
+		}
+	};
+}
+
+export function isDuplicateTab(): Promise<boolean> {
+	ensureChannel();
+	if (!channel) return Promise.resolve(false);
+
+	olderTabSeen = false;
+	channel.postMessage({ type: 'ping', from: tabId, startedAt });
+
+	return new Promise<boolean>((resolve) => {
+		setTimeout(() => {
+			duplicate = olderTabSeen;
+			resolve(duplicate);
+		}, PING_TIMEOUT_MS);
+	});
 }
 
 export async function createBackgroundVideo(
