@@ -156,9 +156,7 @@ export class GameScene {
 						this.monsters?.setHitboxesVisible(visible);
 						this.server.setCombatHitboxesVisible(visible);
 					},
-					(enabled) => this.server.setDebugImmortal(enabled),
 					!urlParams.has('noDebug'),
-					(enabled) => this.server.setMonsterStressTest(enabled),
 					() =>
 						this.monsters?.getDebugStats() ?? {
 							total: room.state.monsters.size,
@@ -199,7 +197,9 @@ export class GameScene {
 					this.server.getPlayerMesh(sessionId),
 				),
 			);
-			this.levelUpMenu = this.track(new LevelUpMenu(this.scene, room));
+			this.levelUpMenu = this.track(
+				new LevelUpMenu(this.scene, room, () => this.keybinds),
+			);
 			this.settings = this.track(
 				new SettingsMenuRender(this.scene, this.camera),
 			);

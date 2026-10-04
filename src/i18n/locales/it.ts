@@ -50,6 +50,7 @@ const it = {
 	'settings.jump': 'Salta',
 	'settings.stats': 'Statistiche del personaggio',
 	'settings.revive': 'Rianima un alleato',
+	'settings.upgradeChoice': 'Scegli il potenziamento {number}',
 	'settings.resetDefaults': 'Ripristina predefiniti',
 	'settings.back': 'Indietro',
 	'settings.space': 'SPAZIO',
@@ -136,8 +137,6 @@ const it = {
 	'debug.monsters': 'Mostri:',
 	'debug.testTools': 'Strumenti di test',
 	'debug.hitboxes': 'Hitbox 3D',
-	'debug.immortalMode': 'Modalità immortale',
-	'debug.stressMonsters': 'Stress di {count} mostri',
 	'debug.notAvailable': 'N/D',
 	'debug.monsterSummary':
 		'{total} ({elites} élite / {bosses} boss / {rendered} visibili)',

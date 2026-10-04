@@ -8,6 +8,9 @@ export const KEY_ACTIONS = [
 	'jump',
 	'stats',
 	'revive',
+	'upgrade1',
+	'upgrade2',
+	'upgrade3',
 	'fov',
 ] as const;
 
@@ -21,6 +24,9 @@ export const DEFAULT_KEY_BINDINGS: Readonly<KeyBindings> = {
 	jump: ' ',
 	stats: 'c',
 	revive: 'f',
+	upgrade1: '1',
+	upgrade2: '2',
+	upgrade3: '3',
 	fov: '90',
 };
 

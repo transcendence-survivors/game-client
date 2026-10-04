@@ -194,14 +194,6 @@ export class ServerOrchestrator {
 		this.combatRenderer?.setHitboxesVisible(visible);
 	}
 
-	setDebugImmortal(enabled: boolean) {
-		this.room.send(ClientMessage.SetDebugImmortal, { enabled });
-	}
-
-	setMonsterStressTest(enabled: boolean) {
-		this.room.send(ClientMessage.SetDebugMonsterStress, { enabled });
-	}
-
 	setReviveIntent(enabled: boolean) {
 		this.room.send(ClientMessage.Revive, { enabled });
 	}

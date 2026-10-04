@@ -50,6 +50,7 @@ const es = {
 	'settings.jump': 'Saltar',
 	'settings.stats': 'Estadísticas del personaje',
 	'settings.revive': 'Reanimar aliado',
+	'settings.upgradeChoice': 'Elegir mejora {number}',
 	'settings.resetDefaults': 'Restablecer valores',
 	'settings.back': 'Volver',
 	'settings.space': 'ESPACIO',
@@ -136,8 +137,6 @@ const es = {
 	'debug.monsters': 'Monstruos:',
 	'debug.testTools': 'Herramientas de prueba',
 	'debug.hitboxes': 'Cajas de colisión 3D',
-	'debug.immortalMode': 'Modo inmortal',
-	'debug.stressMonsters': 'Estrés de {count} monstruos',
 	'debug.notAvailable': 'N/D',
 	'debug.monsterSummary':
 		'{total} ({elites} élites / {bosses} jefes / {rendered} visibles)',

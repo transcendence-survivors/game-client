@@ -12,6 +12,7 @@ import {
 import { iconsImport } from '../assets/icons';
 import { CleanupBag } from '../CleanupBag';
 import { UpgradeQueue } from './UpgradeQueue';
+import type { KeyBindings } from '../settings/KeyBindings';
 import { HUD_THEME } from '../hud/HudTheme';
 import { guiImports } from '../assets/ui';
 import {
@@ -35,6 +36,8 @@ interface UpgradeCardControls {
 	accentColor: string;
 }
 
+const UPGRADE_KEY_ACTIONS = ['upgrade1', 'upgrade2', 'upgrade3'] as const;
+
 const RARITY_COLORS: Readonly<Record<UpgradeOption['rarity'], string>> = {
 	common: '#B8C4C0FF',
 	uncommon: '#58D68DFF',
@@ -54,7 +57,11 @@ export class LevelUpMenu {
 	private disposed = false;
 	private blocked = false;
 
-	constructor(scene: Scene, room: COLYSEUS.Room<GameState>) {
+	constructor(
+		scene: Scene,
+		room: COLYSEUS.Room<GameState>,
+		private readonly getKeybinds: () => Readonly<KeyBindings>,
+	) {
 		this.room = room;
 		this.init(scene);
 	}
@@ -228,12 +235,12 @@ export class LevelUpMenu {
 		const keyDownHandler = (e: KeyboardEvent) => {
 			if (!this.levelUpRootContainer.isVisible) return;
 			if (this.blocked) return;
-			const selectionIndex = Number(e.key) - 1;
-			if (
-				Number.isInteger(selectionIndex) &&
-				selectionIndex >= 0 &&
-				selectionIndex < UPGRADE_CHOICE_COUNT
-			)
+			const key = e.key.toLowerCase();
+			const keybinds = this.getKeybinds();
+			const selectionIndex = UPGRADE_KEY_ACTIONS.findIndex(
+				(action) => keybinds[action] === key,
+			);
+			if (selectionIndex >= 0 && selectionIndex < UPGRADE_CHOICE_COUNT)
 				this.selectUpgrade(selectionIndex);
 		};
 		window.addEventListener('keydown', keyDownHandler);

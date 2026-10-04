@@ -1,6 +1,5 @@
 import * as GUI from '@babylonjs/gui';
 import * as BABYLON from '@babylonjs/core';
-import { MONSTER_DIRECTOR_CONFIG } from '@transcendence/game-shared';
 import { createFullscreenUi } from '../assets/ui';
 import { HUD_THEME, hudText, styleHudPanel } from '../hud/HudTheme';
 import type { MonsterRendererStats } from '../monsters/MonsterRenderer';
@@ -62,8 +61,6 @@ export class DebugMenu {
 	private lastDrawCalls = 0;
 	private lastGpuCounterCount = 0;
 	private readonly onHitboxesChanged: (visible: boolean) => void;
-	private readonly onImmortalChanged: (enabled: boolean) => void;
-	private readonly onMonsterStressChanged: (enabled: boolean) => void;
 	private readonly getMonsterStats: () => Readonly<MonsterRendererStats>;
 	private readonly keyDownHandler = (event: KeyboardEvent) => {
 		if (event.code !== 'F3' || event.repeat || !this.enabled) return;
@@ -76,9 +73,7 @@ export class DebugMenu {
 		engine: BABYLON.Engine,
 		scene: BABYLON.Scene,
 		onHitboxesChanged: (visible: boolean) => void = () => {},
-		onImmortalChanged: (enabled: boolean) => void = () => {},
 		enabled = true,
-		onMonsterStressChanged: (enabled: boolean) => void = () => {},
 		getMonsterStats: () => Readonly<MonsterRendererStats> = () =>
 			EMPTY_MONSTER_STATS,
 	) {
@@ -108,8 +103,6 @@ export class DebugMenu {
 			? engine.onEndFrameObservable.add(() => this.recordFrameTimes())
 			: null;
 		this.onHitboxesChanged = onHitboxesChanged;
-		this.onImmortalChanged = onImmortalChanged;
-		this.onMonsterStressChanged = onMonsterStressChanged;
 		this.getMonsterStats = getMonsterStats;
 		if (enabled) {
 			this.initGUI(scene);
@@ -124,7 +117,7 @@ export class DebugMenu {
 		this.panel = debugMenu;
 
 		debugMenu.width = '430px';
-		debugMenu.height = '640px';
+		debugMenu.height = '560px';
 		debugMenu.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
 		debugMenu.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
 		debugMenu.left = '36px';
@@ -275,24 +268,6 @@ export class DebugMenu {
 				this.hitboxesVisible = visible;
 				this.onHitboxesChanged(visible);
 			},
-		);
-		addToggle(
-			'immortalToggle',
-			gameI18n.t('debug.immortalMode'),
-			'#ffd166',
-			'#ffd166',
-			false,
-			this.onImmortalChanged,
-		);
-		addToggle(
-			'monsterStressToggle',
-			gameI18n.t('debug.stressMonsters', {
-				count: MONSTER_DIRECTOR_CONFIG.stressTestPopulation,
-			}),
-			'#ff7bff',
-			'#ff7bff',
-			false,
-			this.onMonsterStressChanged,
 		);
 	}
 

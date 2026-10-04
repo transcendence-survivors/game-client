@@ -48,6 +48,7 @@ const en = {
 	'settings.jump': 'Jump',
 	'settings.stats': 'Character Stats',
 	'settings.revive': 'Revive Ally',
+	'settings.upgradeChoice': 'Choose upgrade {number}',
 	'settings.resetDefaults': 'Reset Defaults',
 	'settings.back': 'Back',
 	'settings.space': 'SPACE',
@@ -134,8 +135,6 @@ const en = {
 	'debug.monsters': 'Monsters:',
 	'debug.testTools': 'Test tools',
 	'debug.hitboxes': '3D hitboxes',
-	'debug.immortalMode': 'Immortal mode',
-	'debug.stressMonsters': 'Stress {count} monsters',
 	'debug.notAvailable': 'N/A',
 	'debug.monsterSummary':
 		'{total} ({elites} elites / {bosses} bosses / {rendered} visible)',

@@ -35,6 +35,9 @@ const KEY_BUTTON_NAMES: { [K in keyof KeyBindings]: string } = {
 	jump: 'Key_Jump',
 	stats: 'Key_Stats',
 	revive: 'Key_Revive',
+	upgrade1: 'Key_Upgrade1',
+	upgrade2: 'Key_Upgrade2',
+	upgrade3: 'Key_Upgrade3',
 	fov: 'FovSlider',
 };
 
@@ -264,6 +267,13 @@ export class SettingsMenuRender {
 
 		for (const [controlName, key] of Object.entries(labels)) {
 			setText(this.advTex, controlName, gameI18n.t(key));
+		}
+		for (const number of [1, 2, 3]) {
+			setText(
+				this.advTex,
+				`Label_Upgrade${number}`,
+				gameI18n.t('settings.upgradeChoice', { number }),
+			);
 		}
 	}
 }

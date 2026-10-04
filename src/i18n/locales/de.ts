@@ -50,6 +50,7 @@ const de = {
 	'settings.jump': 'Springen',
 	'settings.stats': 'Charakterwerte',
 	'settings.revive': 'Verbündeten aufhelfen',
+	'settings.upgradeChoice': 'Verbesserung {number} wählen',
 	'settings.resetDefaults': 'Standard wiederherstellen',
 	'settings.back': 'Zurück',
 	'settings.space': 'LEERTASTE',
@@ -137,8 +138,6 @@ const de = {
 	'debug.monsters': 'Monster:',
 	'debug.testTools': 'Testwerkzeuge',
 	'debug.hitboxes': '3D-Trefferboxen',
-	'debug.immortalMode': 'Unsterblichkeitsmodus',
-	'debug.stressMonsters': 'Belastung mit {count} Monstern',
 	'debug.notAvailable': 'N/V',
 	'debug.monsterSummary':
 		'{total} ({elites} Elite / {bosses} Bosse / {rendered} sichtbar)',

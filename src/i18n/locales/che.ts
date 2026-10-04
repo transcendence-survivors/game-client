@@ -50,6 +50,7 @@ const che = {
 	'settings.jump': 'Springe',
 	'settings.stats': 'Charakterwärt',
 	'settings.revive': 'Kollege ufhälfe',
+	'settings.upgradeChoice': 'Verbesserig {number} uswähle',
 	'settings.resetDefaults': 'Standard zruggsetze',
 	'settings.back': 'Zrugg',
 	'settings.space': 'LEERTASTE',
@@ -136,8 +137,6 @@ const che = {
 	'debug.monsters': 'Monschter:',
 	'debug.testTools': 'Testwärkzüg',
 	'debug.hitboxes': '3D-Träfferboxe',
-	'debug.immortalMode': 'Unsterblichkeitsmodus',
-	'debug.stressMonsters': 'Belastig mit {count} Monschter',
 	'debug.notAvailable': 'N/V',
 	'debug.monsterSummary':
 		'{total} ({elites} Elite / {bosses} Boss / {rendered} sichtbar)',

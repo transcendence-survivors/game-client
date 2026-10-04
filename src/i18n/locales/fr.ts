@@ -50,6 +50,7 @@ const fr = {
 	'settings.jump': 'Sauter',
 	'settings.stats': 'Fiche de personnage',
 	'settings.revive': 'Relever un allié',
+	'settings.upgradeChoice': "Choisir l'amélioration {number}",
 	'settings.resetDefaults': 'Valeurs par défaut',
 	'settings.back': 'Retour',
 	'settings.space': 'ESPACE',
@@ -136,8 +137,6 @@ const fr = {
 	'debug.monsters': 'Monstres :',
 	'debug.testTools': 'Outils de test',
 	'debug.hitboxes': 'Boîtes de collision 3D',
-	'debug.immortalMode': 'Mode immortel',
-	'debug.stressMonsters': 'Stress de {count} monstres',
 	'debug.notAvailable': 'N/D',
 	'debug.monsterSummary':
 		'{total} ({elites} élites / {bosses} boss / {rendered} visibles)',
