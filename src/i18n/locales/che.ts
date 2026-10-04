@@ -72,7 +72,8 @@ const che = {
 	'hud.downedHint': 'Halt {key} näbet eme Kollege dueche, zum ihn ufzhälfe',
 	'hud.empty': 'Läär',
 	'upgrade.heading': 'WÄHL E VERBESSERIG',
-	'upgrade.subtitle': 'Drück 1, 2 oder 3 — oder klick uf e Charte',
+	'upgrade.subtitle':
+		'Drück {key1}, {key2} oder {key3} — oder klick uf e Charte',
 	'upgrade.level': 'STUFE {level}',
 	'upgrade.tome': 'Foliant',
 	'upgrade.weapon': 'Waffe',

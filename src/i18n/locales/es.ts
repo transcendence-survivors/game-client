@@ -72,7 +72,8 @@ const es = {
 	'hud.downedHint': 'Mantén {key} junto a un aliado para reanimarlo',
 	'hud.empty': 'Vacío',
 	'upgrade.heading': 'ELIGE UNA MEJORA',
-	'upgrade.subtitle': 'Pulsa 1, 2 o 3 — o haz clic en una carta',
+	'upgrade.subtitle':
+		'Pulsa {key1}, {key2} o {key3} — o haz clic en una carta',
 	'upgrade.level': 'NIVEL {level}',
 	'upgrade.tome': 'Tomo',
 	'upgrade.weapon': 'Arma',

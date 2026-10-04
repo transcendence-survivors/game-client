@@ -70,7 +70,7 @@ const en = {
 	'hud.downedHint': 'Hold {key} near an ally to revive them',
 	'hud.empty': 'Empty',
 	'upgrade.heading': 'CHOOSE AN UPGRADE',
-	'upgrade.subtitle': 'Press 1, 2 or 3 — or click a card',
+	'upgrade.subtitle': 'Press {key1}, {key2} or {key3} — or click a card',
 	'upgrade.level': 'LEVEL {level}',
 	'upgrade.tome': 'Tome',
 	'upgrade.weapon': 'Weapon',

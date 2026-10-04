@@ -72,7 +72,8 @@ const fr = {
 	'hud.downedHint': "Maintenez {key} près d'un allié pour le relever",
 	'hud.empty': 'Vide',
 	'upgrade.heading': 'CHOISISSEZ UNE AMÉLIORATION',
-	'upgrade.subtitle': 'Appuyez sur 1, 2 ou 3 — ou cliquez sur une carte',
+	'upgrade.subtitle':
+		'Appuyez sur {key1}, {key2} ou {key3} — ou cliquez sur une carte',
 	'upgrade.level': 'NIVEAU {level}',
 	'upgrade.tome': 'Tome',
 	'upgrade.weapon': 'Arme',

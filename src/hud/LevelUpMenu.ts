@@ -12,7 +12,7 @@ import {
 import { iconsImport } from '../assets/icons';
 import { CleanupBag } from '../CleanupBag';
 import { UpgradeQueue } from './UpgradeQueue';
-import type { KeyBindings } from '../settings/KeyBindings';
+import { formatKeyLabel, type KeyBindings } from '../settings/KeyBindings';
 import { HUD_THEME } from '../hud/HudTheme';
 import { guiImports } from '../assets/ui';
 import {
@@ -33,6 +33,7 @@ interface UpgradeCardControls {
 	separator: GUI.Rectangle;
 	rarityBadge: GUI.Rectangle;
 	rarityText: GUI.TextBlock;
+	keyText: GUI.TextBlock;
 	accentColor: string;
 }
 
@@ -49,6 +50,7 @@ const RARITY_COLORS: Readonly<Record<UpgradeOption['rarity'], string>> = {
 export class LevelUpMenu {
 	private advTex!: GUI.AdvancedDynamicTexture;
 	private levelUpRootContainer!: GUI.Rectangle;
+	private subtitle!: GUI.TextBlock;
 	private currentOptions: readonly UpgradeOption[] = [];
 	private readonly queue = new UpgradeQueue();
 	private readonly room: COLYSEUS.Room<GameState>;
@@ -76,9 +78,9 @@ export class LevelUpMenu {
 		this.levelUpRootContainer.isVisible = false;
 		(this.advTex.getControlByName('LevelUpHeading') as GUI.TextBlock).text =
 			gameI18n.t('upgrade.heading');
-		(
-			this.advTex.getControlByName('LevelUpSubtitle') as GUI.TextBlock
-		).text = gameI18n.t('upgrade.subtitle');
+		this.subtitle = this.advTex.getControlByName(
+			'LevelUpSubtitle',
+		) as GUI.TextBlock;
 		this.cards = Array.from({ length: UPGRADE_CHOICE_COUNT }, (_, index) =>
 			this.getCardControls(index),
 		);
@@ -116,6 +118,9 @@ export class LevelUpMenu {
 		const rarityText = this.advTex.getControlByName(
 			`UpgradeCard${index}Rarity`,
 		) as GUI.TextBlock;
+		const keyText = this.advTex.getControlByName(
+			`UpgradeCard${index}Key`,
+		) as GUI.TextBlock;
 
 		return {
 			panel,
@@ -128,6 +133,7 @@ export class LevelUpMenu {
 			separator,
 			rarityBadge,
 			rarityText,
+			keyText,
 			accentColor: HUD_THEME.gold,
 		};
 	}
@@ -155,6 +161,22 @@ export class LevelUpMenu {
 		this.disposed = true;
 		this.subscriptions.dispose();
 		this.advTex.dispose();
+	}
+
+	private updateKeyLabels(): void {
+		const keybinds = this.getKeybinds();
+		const labels = UPGRADE_KEY_ACTIONS.map((action) =>
+			formatKeyLabel(keybinds[action]),
+		);
+		const [key1, key2, key3] = labels;
+		this.subtitle.text = gameI18n.t('upgrade.subtitle', {
+			key1,
+			key2,
+			key3,
+		});
+		this.cards.forEach((card, index) => {
+			card.keyText.text = labels[index] ?? '';
+		});
 	}
 
 	private updateCards(options: readonly UpgradeOption[]): void {
@@ -273,6 +295,7 @@ export class LevelUpMenu {
 						return;
 					}
 					this.updateCards(options);
+					this.updateKeyLabels();
 					this.levelUpRootContainer.isVisible = true;
 				},
 			),

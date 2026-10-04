@@ -73,7 +73,8 @@ const de = {
 		'Halte {key} neben einem Verbündeten gedrückt, um ihn aufzurichten',
 	'hud.empty': 'Leer',
 	'upgrade.heading': 'WÄHLE EINE VERBESSERUNG',
-	'upgrade.subtitle': 'Drücke 1, 2 oder 3 — oder klicke auf eine Karte',
+	'upgrade.subtitle':
+		'Drücke {key1}, {key2} oder {key3} — oder klicke auf eine Karte',
 	'upgrade.level': 'STUFE {level}',
 	'upgrade.tome': 'Foliant',
 	'upgrade.weapon': 'Waffe',

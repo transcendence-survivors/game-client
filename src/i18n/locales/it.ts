@@ -72,7 +72,8 @@ const it = {
 	'hud.downedHint': 'Tieni premuto {key} vicino a un alleato per rianimarlo',
 	'hud.empty': 'Vuoto',
 	'upgrade.heading': 'SCEGLI UN POTENZIAMENTO',
-	'upgrade.subtitle': 'Premi 1, 2 o 3 — oppure clicca su una carta',
+	'upgrade.subtitle':
+		'Premi {key1}, {key2} o {key3} — oppure clicca su una carta',
 	'upgrade.level': 'LIVELLO {level}',
 	'upgrade.tome': 'Tomo',
 	'upgrade.weapon': 'Arma',
