@@ -1,9 +1,6 @@
 import * as BABYLON from '@babylonjs/core';
 import { TAU, type CombatEntity } from '@transcendence/game-shared';
-import {
-	weaponModels,
-	type WeaponModelTransform,
-} from '../assets/models/weapons/weaponModels';
+import { weaponModels } from '../assets/models/weapons/weaponModels';
 import { CombatAssetLibrary } from './CombatAssetLibrary';
 import { CombatEntityView, ProjectileView } from './CombatEntityView';
 
@@ -112,7 +109,11 @@ export class CombatViewFactory {
 			parent.parent = root;
 		}
 		model.parent = parent;
-		this.applyTransform(model, weaponModels[kind].combat);
+		const transform = weaponModels[kind].combat;
+		model.rotationQuaternion = null;
+		model.position.set(...transform.position);
+		model.rotation.set(...transform.rotation);
+		model.scaling.setAll(transform.scale);
 		if (kind === 'axe') {
 			model.scaling.scaleInPlace(entity.scale);
 			return new ProjectileView(entity, root, (deltaTimeS) => {
@@ -120,16 +121,6 @@ export class CombatViewFactory {
 			});
 		}
 		return new ProjectileView(entity, root);
-	}
-
-	private applyTransform(
-		root: BABYLON.TransformNode,
-		transform: WeaponModelTransform,
-	): void {
-		root.rotationQuaternion = null;
-		root.position.set(...transform.position);
-		root.rotation.set(...transform.rotation);
-		root.scaling.setAll(transform.scale);
 	}
 
 	dispose(): void {

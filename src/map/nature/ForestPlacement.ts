@@ -1,5 +1,6 @@
 import {
 	clamp01,
+	mulberry32,
 	TAU,
 	type Vec2d,
 	type World,
@@ -95,20 +96,12 @@ interface PlacementRule {
 	readonly maxScale: number;
 }
 
-interface RandomSource {
-	next(): number;
-}
-
-interface TerrainFields {
+interface TerrainFields extends WorldSurfaceSample {
 	path: number;
 	grove: number;
 	meadow: number;
 	rocky: number;
 	slope: number;
-	height: number;
-	normalX: number;
-	normalY: number;
-	normalZ: number;
 }
 
 interface GroundFeatureScratch {
@@ -120,7 +113,6 @@ interface PlacementContext {
 	readonly world: World;
 	readonly placements: PackedForestPlacements;
 	readonly grid: PlacementGrid;
-	readonly surface: WorldSurfaceSample;
 	readonly features: GroundFeatureScratch;
 	readonly fields: TerrainFields;
 }
@@ -185,36 +177,30 @@ const RULE_BY_KIND = Object.fromEntries(
 ) as Readonly<Record<ForestPlacementKind, PlacementRule>>;
 
 export const FOREST_BIOMES = ['meadow', 'forest', 'rocky'] as const;
-const FOREST_KIND_INDEX: Readonly<Record<ForestPlacementKind, number>> = {
-	tree: 0,
-	rock: 1,
-	bush: 2,
-	grass: 3,
-	flower: 4,
-};
-const FOREST_BIOME_INDEX: Readonly<Record<ForestBiome, number>> = {
-	meadow: 0,
-	forest: 1,
-	rocky: 2,
-};
 const REMOVABLE_PLACEMENT_KINDS: readonly ForestPlacementKind[] = [
 	'flower',
 	'grass',
 	'bush',
 	'rock',
 ];
-const ROCKY_FILLERS = [
-	['rock', 'grass', 'flower', 'bush'],
-	['grass', 'rock', 'flower', 'bush'],
-] as const satisfies readonly (readonly ForestPlacementKind[])[];
-const FOREST_FILLERS = [
-	['bush', 'grass', 'flower', 'rock'],
-	['grass', 'flower', 'bush', 'rock'],
-] as const satisfies readonly (readonly ForestPlacementKind[])[];
-const MEADOW_FILLERS = [
-	['grass', 'flower', 'bush', 'rock'],
-	['flower', 'grass', 'bush', 'rock'],
-] as const satisfies readonly (readonly ForestPlacementKind[])[];
+type FillerKinds = readonly ForestPlacementKind[];
+const FILLERS: Record<ForestBiome, [number, FillerKinds, FillerKinds]> = {
+	rocky: [
+		0.58,
+		['rock', 'grass', 'flower', 'bush'],
+		['grass', 'rock', 'flower', 'bush'],
+	],
+	forest: [
+		0.42,
+		['bush', 'grass', 'flower', 'rock'],
+		['grass', 'flower', 'bush', 'rock'],
+	],
+	meadow: [
+		0.6,
+		['grass', 'flower', 'bush', 'rock'],
+		['flower', 'grass', 'bush', 'rock'],
+	],
+};
 
 function hash(
 	seed: number,
@@ -229,12 +215,8 @@ function hash(
 	return (value ^ (value >>> 15)) >>> 0;
 }
 
-function ruleFor(kind: ForestPlacementKind): PlacementRule {
-	return RULE_BY_KIND[kind];
-}
-
-function randomBetween(random: RandomSource, min: number, max: number): number {
-	return min + (max - min) * random.next();
+function randomBetween(random: () => number, min: number, max: number): number {
+	return min + (max - min) * random();
 }
 
 function terrainFields(
@@ -242,13 +224,13 @@ function terrainFields(
 	x: number,
 	z: number,
 ): TerrainFields {
-	const { world, surface, features, fields: result } = ctx;
+	const { world, features, fields: result } = ctx;
 	const gx = Math.floor(x / world.CELL);
 	const gz = Math.floor(z / world.CELL);
 	const tierFactor =
 		world.TIERS <= 1 ? 0 : world.tier(gx, gz) / (world.TIERS - 1);
-	world.sampleSurfaceToRef(x, z, surface);
-	const slope = clamp01((1 - surface.y) * 4.5);
+	world.sampleSurfaceToRef(x, z, result);
+	const slope = clamp01((1 - result.y) * 4.5);
 	const biome = groundBiomeWeights(x, z, world.seed, features.biome);
 	const grove = clamp01(
 		biome.forest *
@@ -261,15 +243,11 @@ function terrainFields(
 			smoothstep(0.18, 0.5, slope) * 0.42 +
 			smoothstep(0.55, 0.85, tierFactor) * 0.22,
 	);
-	result.path = groundPathFactor(x, z, world.seed, features.path);
+	result.path = groundPathFactor(x, z, features.path);
 	result.grove = grove;
 	result.meadow = meadow;
 	result.rocky = rocky;
 	result.slope = slope;
-	result.height = surface.height;
-	result.normalX = surface.x;
-	result.normalY = surface.y;
-	result.normalZ = surface.z;
 	return result;
 }
 
@@ -373,7 +351,7 @@ function isFarEnough(
 			for (const index of nearby) {
 				if (index >= placements.length) continue;
 				const otherKind = placements.kindAt(index);
-				const otherRule = ruleFor(otherKind);
+				const otherRule = RULE_BY_KIND[otherKind];
 				const otherFinePlacement = isFinePlacement(otherKind);
 				const bothFine = finePlacement && otherFinePlacement;
 				const oneFine = finePlacement || otherFinePlacement;
@@ -392,14 +370,14 @@ function isFarEnough(
 
 function tryPlace(
 	ctx: PlacementContext,
-	random: RandomSource,
+	random: () => number,
 	rule: PlacementRule,
 	x: number,
 	z: number,
 ): boolean {
-	const rotationY = random.next() * TAU;
+	const rotationY = random() * TAU;
 	const scale = randomBetween(random, rule.minScale, rule.maxScale);
-	const variant = Math.floor(random.next() * 100_000);
+	const variant = Math.floor(random() * 100_000);
 	if (!isFarEnough(ctx, rule, x, z)) return false;
 	const { placements, fields } = ctx;
 	const biome = biomeFor(fields);
@@ -476,14 +454,14 @@ class PackedForestPlacements {
 				`Forest chunk generated more than ${FOREST_PLACEMENT_CAPACITY} placements`,
 			);
 		const offset = this.length * FOREST_PLACEMENT_STRIDE;
-		this.data[offset] = FOREST_KIND_INDEX[kind];
-		this.data[offset + 1] = FOREST_BIOME_INDEX[biome];
+		this.data[offset] = FOREST_PLACEMENT_KINDS.indexOf(kind);
+		this.data[offset + 1] = FOREST_BIOMES.indexOf(biome);
 		this.data[offset + 2] = x;
 		this.data[offset + 3] = z;
 		this.data[offset + 4] = fields.height;
-		this.data[offset + 5] = fields.normalX;
-		this.data[offset + 6] = fields.normalY;
-		this.data[offset + 7] = fields.normalZ;
+		this.data[offset + 5] = fields.x;
+		this.data[offset + 6] = fields.y;
+		this.data[offset + 7] = fields.z;
 		this.data[offset + 8] = rotationY;
 		this.data[offset + 9] = scale;
 		this.data[offset + 10] = variant;
@@ -508,16 +486,6 @@ export function generateForestPlacementsInto(
 	output: Float64Array,
 ): number {
 	const placements = new PackedForestPlacements(output);
-	generateForestPlacementsInternal(world, chunkX, chunkZ, placements);
-	return placements.length;
-}
-
-function generateForestPlacementsInternal(
-	world: World,
-	chunkX: number,
-	chunkZ: number,
-	placements: PackedForestPlacements,
-): void {
 	const chunkSize = world.N * world.CELL;
 	const originX = chunkX * chunkSize;
 	const originZ = chunkZ * chunkSize;
@@ -525,7 +493,6 @@ function generateForestPlacementsInternal(
 		world,
 		placements,
 		grid: new PlacementGrid(),
-		surface: { height: 0, x: 0, y: 1, z: 0 },
 		features: {
 			biome: { meadow: 0, forest: 0, rocky: 0 },
 			path: createGroundPathParameters(world.seed),
@@ -537,29 +504,29 @@ function generateForestPlacementsInternal(
 			rocky: 0,
 			slope: 0,
 			height: 0,
-			normalX: 0,
-			normalY: 1,
-			normalZ: 0,
+			x: 0,
+			y: 1,
+			z: 0,
 		},
 	};
-	const densityRandom = createRandom(
+	const densityRandom = mulberry32(
 		hash(world.seed, chunkX, chunkZ, 0x7f4a7c15),
 	);
 	const targetCount =
 		MIN_PLACEMENTS_PER_CHUNK +
 		Math.floor(
-			densityRandom.next() *
+			densityRandom() *
 				(MAX_PLACEMENTS_PER_CHUNK - MIN_PLACEMENTS_PER_CHUNK + 1),
 		);
 
 	for (let ruleIndex = 0; ruleIndex < RULES.length; ruleIndex++) {
 		const rule = RULES[ruleIndex];
-		const random = createRandom(
+		const random = mulberry32(
 			hash(world.seed, chunkX, chunkZ, ruleIndex + 1),
 		);
 		const count =
 			rule.minCount +
-			Math.floor(random.next() * (rule.maxCount - rule.minCount + 1));
+			Math.floor(random() * (rule.maxCount - rule.minCount + 1));
 		let accepted = 0;
 
 		for (
@@ -590,7 +557,7 @@ function generateForestPlacementsInternal(
 						z * 0.075 - ruleIndex * 11,
 						world.seed ^ (0x3c6ef372 + ruleIndex * 0x101),
 					);
-			if (random.next() > placementProbability(rule.kind, fields, patch))
+			if (random() > placementProbability(rule.kind, fields, patch))
 				continue;
 
 			if (tryPlace(ctx, random, rule, x, z)) accepted++;
@@ -605,6 +572,7 @@ function generateForestPlacementsInternal(
 		targetCount,
 		densityRandom,
 	);
+	return placements.length;
 }
 
 function trimPlacementBudget(
@@ -612,17 +580,13 @@ function trimPlacementBudget(
 	placementGrid: PlacementGrid,
 	targetCount: number,
 ): void {
-	if (placements.length > targetCount) {
-		for (const kind of REMOVABLE_PLACEMENT_KINDS) {
-			for (
-				let index = placements.length - 1;
-				placements.length > targetCount && index >= 0;
-				index--
-			) {
-				if (placements.kindAt(index) === kind) placements.remove(index);
-			}
-		}
-	}
+	for (const kind of REMOVABLE_PLACEMENT_KINDS)
+		for (
+			let index = placements.length - 1;
+			placements.length > targetCount && index >= 0;
+			index--
+		)
+			if (placements.kindAt(index) === kind) placements.remove(index);
 	placementGrid.clear();
 	for (let index = 0; index < placements.length; index++)
 		placementGrid.add(placements.xAt(index), placements.zAt(index), index);
@@ -634,7 +598,7 @@ function fillPlacementBudget(
 	originZ: number,
 	chunkSize: number,
 	targetCount: number,
-	random: RandomSource,
+	random: () => number,
 ): void {
 	for (
 		let attempt = 0;
@@ -653,8 +617,8 @@ function fillPlacementBudget(
 		);
 		if (x * x + z * z < START_CLEAR_RADIUS * START_CLEAR_RADIUS) continue;
 		const fields = terrainFields(ctx, x, z);
-		const biome = biomeFor(fields);
-		const candidates = fillerKinds(biome, random);
+		const [threshold, first, second] = FILLERS[biomeFor(fields)];
+		const candidates = random() < threshold ? first : second;
 		let kind: ForestPlacementKind | undefined;
 		for (const candidate of candidates) {
 			if (isValidGround(ctx.world, candidate, x, z, fields)) {
@@ -663,30 +627,6 @@ function fillPlacementBudget(
 			}
 		}
 		if (!kind) continue;
-		tryPlace(ctx, random, ruleFor(kind), x, z);
+		tryPlace(ctx, random, RULE_BY_KIND[kind], x, z);
 	}
-}
-
-function fillerKinds(
-	biome: ForestBiome,
-	random: RandomSource,
-): readonly ForestPlacementKind[] {
-	if (biome === 'rocky')
-		return random.next() < 0.58 ? ROCKY_FILLERS[0] : ROCKY_FILLERS[1];
-	if (biome === 'forest')
-		return random.next() < 0.42 ? FOREST_FILLERS[0] : FOREST_FILLERS[1];
-	return random.next() < 0.6 ? MEADOW_FILLERS[0] : MEADOW_FILLERS[1];
-}
-
-function createRandom(seed: number): RandomSource {
-	let state = seed >>> 0;
-	return {
-		next(): number {
-			state = (state + 0x6d2b79f5) | 0;
-			let value = Math.imul(state ^ (state >>> 15), 1 | state);
-			value =
-				(value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
-			return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-		},
-	};
 }

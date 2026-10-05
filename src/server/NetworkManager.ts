@@ -19,21 +19,10 @@ export class NetworkManager {
 		this.client = new Client(gameSocketUrl);
 	}
 
-	async createRoom(rawName: string) {
+	async enterRoom(rawName: string, create: boolean) {
 		try {
 			return persistRoom(
-				await this.client.create<GameState>(
-					GAME_ROOM_TYPE,
-					this.roomOptions(rawName),
-				),
-			);
-		} catch (error) {}
-	}
-
-	async joinRoomByName(rawName: string) {
-		try {
-			return persistRoom(
-				await this.client.join<GameState>(
+				await this.client[create ? 'create' : 'join']<GameState>(
 					GAME_ROOM_TYPE,
 					this.roomOptions(rawName),
 				),

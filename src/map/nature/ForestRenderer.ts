@@ -4,8 +4,10 @@ import type { MapGenerator } from '../MapGenerator';
 import type { ModelAssetLibrary } from '../../assets/ModelAssetLibrary';
 import { models } from '../../assets/models';
 import {
+	type ForestBiome,
 	type ForestPlacement,
 	type ForestPlacementBuffer,
+	type ForestPlacementKind,
 	readForestPlacement,
 } from './ForestPlacement';
 import type { WorldGenerationClient } from '../world/WorldGenerationClient';
@@ -70,6 +72,15 @@ const CONTACT_EPSILON = 0.0001;
 const FOREST_PUBLICATION_BUDGET_MS = 3;
 const FOREST_PLACEMENTS_PER_PUBLICATION = 16;
 const UNSUPPORTED_MODEL = 'model cannot be thin-instanced';
+const PREFERRED_VARIANTS: Readonly<
+	Record<ForestPlacementKind, Record<ForestBiome, readonly number[]>>
+> = {
+	tree: { meadow: [0, 1], forest: [3], rocky: [2] },
+	rock: { meadow: [2, 3], forest: [0, 1], rocky: [0, 1] },
+	bush: { meadow: [1], forest: [0], rocky: [0] },
+	grass: { meadow: [0, 1], forest: [2, 3], rocky: [2, 3] },
+	flower: { meadow: [1, 2, 4, 5], forest: [0, 3], rocky: [0, 3, 5] },
+};
 
 function capSupportPoints(
 	points: readonly SupportPoint[],
@@ -587,10 +598,6 @@ export class ForestRenderer {
 		this.refreshThinInstanceBatch(batch);
 	}
 
-	private isChunkVisible(key: string): boolean {
-		return this.chunks.get(key)?.visible ?? true;
-	}
-
 	private refreshThinInstanceBatch(batch: ThinInstanceBatch): void {
 		let visibleInstanceCount = 0;
 		for (
@@ -599,7 +606,10 @@ export class ForestRenderer {
 			instanceIndex++
 		) {
 			const chunkKey = batch.instanceChunkKeys[instanceIndex];
-			if (chunkKey === undefined || !this.isChunkVisible(chunkKey))
+			if (
+				chunkKey === undefined ||
+				!(this.chunks.get(chunkKey)?.visible ?? true)
+			)
 				continue;
 			batch.visibleMatrixData.set(
 				batch.matrixData.subarray(
@@ -634,13 +644,6 @@ export class ForestRenderer {
 		}
 		batch.bufferInitialized = true;
 		batch.lastVisibilityVersion = this.visibilityVersion;
-	}
-
-	private refreshThinInstanceVisibility(): void {
-		for (const page of this.pages.values())
-			for (const batch of page.thinBatches.values())
-				if (batch.lastVisibilityVersion !== this.visibilityVersion)
-					this.refreshThinInstanceBatch(batch);
 	}
 
 	private prepareThinInstanceSource(
@@ -879,7 +882,10 @@ export class ForestRenderer {
 			}
 		}
 		if (chunkVisibilityChanged) this.visibilityVersion++;
-		this.refreshThinInstanceVisibility();
+		for (const page of this.pages.values())
+			for (const batch of page.thinBatches.values())
+				if (batch.lastVisibilityVersion !== this.visibilityVersion)
+					this.refreshThinInstanceBatch(batch);
 		this.lastVisibilityCamera = camera;
 		this.lastViewProjection.set(viewProjection);
 		this.lastVisibilityZoneCenterX = zoneCenter.x;
@@ -1051,30 +1057,8 @@ export class ForestRenderer {
 
 	private modelUrl(placement: ForestPlacement): string {
 		const variants = models.environment.forest[placement.kind];
-		let preferredVariants: readonly number[] = [0];
-		if (placement.kind === 'tree') {
-			preferredVariants =
-				placement.biome === 'forest'
-					? [3]
-					: placement.biome === 'rocky'
-						? [2]
-						: [0, 1];
-		} else if (placement.kind === 'bush') {
-			preferredVariants = placement.biome === 'meadow' ? [1] : [0];
-		} else if (placement.kind === 'grass') {
-			preferredVariants = placement.biome === 'meadow' ? [0, 1] : [2, 3];
-		} else if (placement.kind === 'flower') {
-			preferredVariants =
-				placement.biome === 'forest'
-					? [0, 3]
-					: placement.biome === 'rocky'
-						? [0, 3, 5]
-						: [1, 2, 4, 5];
-		} else if (placement.biome === 'meadow') {
-			preferredVariants = [2, 3];
-		} else {
-			preferredVariants = [0, 1];
-		}
+		const preferredVariants =
+			PREFERRED_VARIANTS[placement.kind][placement.biome];
 		const variant =
 			preferredVariants[placement.variant % preferredVariants.length] ??
 			0;

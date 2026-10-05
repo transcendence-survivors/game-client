@@ -8,29 +8,19 @@ import { SceneManager } from './SceneManager';
 import { gameI18n } from '../i18n';
 import { setText } from '../i18n/gui';
 import { clearStoredRoom } from '../server/NetworkManager';
-import { createBackgroundVideo } from './LobbyScene';
+import { MenuScene } from './MenuScene';
 
-export class WaitingScreen {
-	private advTex!: GUI.AdvancedDynamicTexture;
-	private scene: BABYLON.Scene;
-	private engine: BABYLON.Engine;
+export class WaitingScreen extends MenuScene {
 	private room: COLYSEUS.Room<GameState>;
 	public readonly ready: Promise<void>;
-	private backgroundLayer!: BABYLON.Layer;
-	private videoTexture!: BABYLON.VideoTexture;
 
 	constructor(engine: BABYLON.Engine, room: COLYSEUS.Room<GameState>) {
-		this.engine = engine;
+		super();
 		this.room = room;
 		this.room.onMessage('gameStart', ({ seed }: { seed: number }) =>
 			SceneManager.toGame(this.room, seed),
 		);
-		this.scene = new BABYLON.Scene(this.engine);
-		new BABYLON.FreeCamera(
-			'EndingScreenCam',
-			BABYLON.Vector3.Zero(),
-			this.scene,
-		);
+		this.createScene(engine, 'EndingScreenCam');
 		this.ready = this.show();
 	}
 
@@ -39,30 +29,13 @@ export class WaitingScreen {
 	}
 
 	async show() {
-		this.advTex = GUI.AdvancedDynamicTexture.CreateFullscreenUI(
-			'WaitingScreen',
-			true,
-			this.scene,
-		);
-		this.advTex.idealWidth = 1920;
-		this.advTex.idealHeight = 1080;
-		this.advTex.renderAtIdealSize = true;
-		const bg = await createBackgroundVideo(this.scene, () => false);
-		if (!bg) return;
-		this.videoTexture = bg.videoTexture;
-		this.backgroundLayer = bg.backgroundLayer;
+		this.createUi('WaitingScreen');
+		if (!(await this.loadBackground(() => false))) return;
 		await this.advTex.parseFromURLAsync(guiImports.waitingScreen);
 		setText(this.advTex, 'ReadyText', gameI18n.t('waiting.notReady'));
 		this.fillData();
 		this.connectButtons();
 		this.connectTitleButton();
-	}
-
-	dispose() {
-		if (this.videoTexture) this.videoTexture.dispose();
-		if (this.backgroundLayer) this.backgroundLayer.dispose();
-		if (this.advTex) this.advTex.dispose();
-		if (this.scene) this.scene.dispose();
 	}
 
 	private fillData() {

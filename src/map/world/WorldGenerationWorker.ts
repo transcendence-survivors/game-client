@@ -1,21 +1,14 @@
 import { World } from '@transcendence/game-shared';
 import {
-	FOREST_PLACEMENT_CAPACITY,
-	FOREST_PLACEMENT_STRIDE,
 	GENERATION_HEADER_BYTES,
-	isSharedGenerationBuffer,
+	GENERATION_READY,
 	TERRAIN_SURFACE_STRIDE,
-	writeGenerationReady,
+	writeGenerationHeader,
 	type GenerationResponse,
 	type GenerationTask,
 } from './WorldGenerationProtocol';
-import {
-	generateForestPlacementsInto,
-} from '../nature/ForestPlacement';
-import {
-	writeTerrainSurface,
-	terrainSurfaceSegments,
-} from './TerrainSurface';
+import { generateForestPlacementsInto } from '../nature/ForestPlacement';
+import { writeTerrainSurface, terrainSurfaceSegments } from './TerrainSurface';
 
 interface WorkerMessageEvent {
 	data: GenerationTask;
@@ -46,62 +39,36 @@ function publish(task: GenerationTask, response: GenerationResponse): void {
 	}
 }
 
-function generateForest(
-	task: Extract<GenerationTask, { kind: 'forest' }>,
-): void {
-	const world = worldFor(task.seed);
-	const header = new Int32Array(task.buffer, 0, 2);
-	const output = new Float64Array(task.buffer, GENERATION_HEADER_BYTES);
-	if (
-		output.length <
-		FOREST_PLACEMENT_CAPACITY * FOREST_PLACEMENT_STRIDE
-	)
-		throw new Error('Forest placement output buffer is too small');
-	const count = generateForestPlacementsInto(
-		world,
-		task.chunkX,
-		task.chunkZ,
-		output,
-	);
-	writeGenerationReady(
-		header,
-		count,
-		isSharedGenerationBuffer(task.buffer),
-	);
-	publish(task, { id: task.id, kind: task.kind, buffer: task.buffer });
-}
-
-function generateTerrain(
-	task: Extract<GenerationTask, { kind: 'terrain' }>,
-): void {
-	const world = worldFor(task.seed);
-	const vertexCount = (terrainSurfaceSegments(world) + 1) ** 2;
-
-	const header = new Int32Array(task.buffer, 0, 2);
-	const output = new Float32Array(task.buffer, GENERATION_HEADER_BYTES);
-	const normalsOffset = vertexCount;
-	if (output.length < vertexCount * TERRAIN_SURFACE_STRIDE)
-		throw new Error('Terrain surface output buffer is too small');
-	writeTerrainSurface(
-		world,
-		task.chunkX,
-		task.chunkZ,
-		output.subarray(0, vertexCount),
-		output.subarray(normalsOffset, vertexCount * TERRAIN_SURFACE_STRIDE),
-	);
-	writeGenerationReady(
-		header,
-		vertexCount,
-		isSharedGenerationBuffer(task.buffer),
-	);
-	publish(task, { id: task.id, kind: task.kind, buffer: task.buffer });
-}
-
 scope.onmessage = (event) => {
 	const task = event.data;
 	try {
-		if (task.kind === 'forest') generateForest(task);
-		else generateTerrain(task);
+		const world = worldFor(task.seed);
+		let count: number;
+		if (task.kind === 'forest')
+			count = generateForestPlacementsInto(
+				world,
+				task.chunkX,
+				task.chunkZ,
+				new Float64Array(task.buffer, GENERATION_HEADER_BYTES),
+			);
+		else {
+			count = (terrainSurfaceSegments(world) + 1) ** 2;
+			const output = new Float32Array(
+				task.buffer,
+				GENERATION_HEADER_BYTES,
+			);
+			if (output.length < count * TERRAIN_SURFACE_STRIDE)
+				throw new Error('Terrain surface output buffer is too small');
+			writeTerrainSurface(
+				world,
+				task.chunkX,
+				task.chunkZ,
+				output.subarray(0, count),
+				output.subarray(count, count * TERRAIN_SURFACE_STRIDE),
+			);
+		}
+		writeGenerationHeader(task.buffer, GENERATION_READY, count);
+		publish(task, { id: task.id, kind: task.kind, buffer: task.buffer });
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		publish(task, {

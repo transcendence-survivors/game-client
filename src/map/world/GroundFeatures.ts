@@ -5,10 +5,6 @@ function pathBand(distance: number, innerRadius: number, outerRadius: number) {
 	return 1 - smoothstep(innerRadius, outerRadius, Math.abs(distance));
 }
 
-function sharpenBiomeScore(score: number): number {
-	return score ** 1.65;
-}
-
 export interface GroundBiomeWeights {
 	meadow: number;
 	forest: number;
@@ -55,9 +51,9 @@ export function groundBiomeWeights(
 			(1 - smoothstep(0.66, 0.84, elevation) * 0.55) *
 			0.95 +
 		(1 - elevation) * 0.12;
-	const sharpMeadow = sharpenBiomeScore(meadowScore);
-	const sharpForest = sharpenBiomeScore(forestScore);
-	const sharpRocky = sharpenBiomeScore(rockyScore);
+	const sharpMeadow = meadowScore ** 1.65;
+	const sharpForest = forestScore ** 1.65;
+	const sharpRocky = rockyScore ** 1.65;
 	const total = sharpMeadow + sharpForest + sharpRocky;
 	result.meadow = sharpMeadow / total;
 	result.forest = sharpForest / total;
@@ -68,13 +64,8 @@ export function groundBiomeWeights(
 export function groundPathFactor(
 	x: number,
 	z: number,
-	seed: number,
-	parameters?: GroundPathParameters,
+	{ phase, sinPhase, sinNegativeHalfPhase }: GroundPathParameters,
 ): number {
-	const phase = parameters?.phase ?? ((seed >>> 0) / 4294967296) * TAU;
-	const sinPhase = parameters?.sinPhase ?? Math.sin(phase);
-	const sinNegativeHalfPhase =
-		parameters?.sinNegativeHalfPhase ?? Math.sin(-phase * 0.5);
 	const centerLine =
 		0.12 * x +
 		13 * (Math.sin(x * 0.028 + phase) - sinPhase) +

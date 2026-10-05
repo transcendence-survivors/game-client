@@ -14,6 +14,7 @@ import { gameI18n } from '../i18n';
 import { setInputPlaceholder, setText } from '../i18n/gui';
 import type { UserInfos } from '../../../shared-package/src/utils/Types';
 import { iconsImport } from '../assets/icons';
+import { MenuScene } from './MenuScene';
 
 interface LobbyControls {
 	input: GUI.InputText;
@@ -27,32 +28,23 @@ interface LobbyControls {
 	titleText: GUI.TextBlock;
 }
 
-export class LobbyScene {
-	private scene: BABYLON.Scene;
-	private advTex!: GUI.AdvancedDynamicTexture;
+export class LobbyScene extends MenuScene {
 	private network!: NetworkManager;
-	private engine: BABYLON.Engine;
 	private room!: COLYSEUS.Room<GameState>;
 	public readonly ready: Promise<void>;
 
-	private backgroundLayer!: BABYLON.Layer;
-	private videoTexture!: BABYLON.VideoTexture;
-
 	private reconnecting: boolean = false;
 	private user: UserInfos;
-
-	private disposed = false;
 
 	constructor(
 		engine: BABYLON.Engine,
 		user: UserInfos,
 		gameSocketUrl: string,
 	) {
-		this.engine = engine;
+		super();
 		this.network = new NetworkManager(user, gameSocketUrl);
 		this.user = user;
-		this.scene = new BABYLON.Scene(this.engine);
-		new BABYLON.FreeCamera('LobbyCam', BABYLON.Vector3.Zero(), this.scene);
+		this.createScene(engine, 'LobbyCam');
 		this.ready = this.show();
 	}
 
@@ -71,22 +63,11 @@ export class LobbyScene {
 		if (await this.tryReconnect()) return;
 		if (this.disposed) return;
 		this.advTex = createFullscreenUi('LobbyUi', this.scene);
-		const bg = await createBackgroundVideo(this.scene, () => this.disposed);
-		if (!bg || this.disposed) return;
-		this.videoTexture = bg.videoTexture;
-		this.backgroundLayer = bg.backgroundLayer;
+		if (!(await this.loadBackground(() => this.disposed))) return;
 		await this.advTex.parseFromURLAsync(guiImports.lobby);
 		if (this.disposed) return;
 		this.applyTranslations();
 		this.linkControls();
-	}
-
-	dispose() {
-		this.disposed = true;
-		if (this.videoTexture) this.videoTexture.dispose();
-		if (this.backgroundLayer) this.backgroundLayer.dispose();
-		if (this.advTex) this.advTex.dispose();
-		if (this.scene) this.scene.dispose();
 	}
 
 	private async waitForState(room: COLYSEUS.Room<GameState>) {
@@ -176,9 +157,7 @@ export class LobbyScene {
 				gameI18n.t(create ? 'lobby.creatingRoom' : 'lobby.joiningRoom'),
 			);
 			try {
-				const newRoom = create
-					? await this.network.createRoom(roomName)
-					: await this.network.joinRoomByName(roomName);
+				const newRoom = await this.network.enterRoom(roomName, create);
 				if (newRoom) {
 					this.room = newRoom;
 				} else throw new Error('Could not find the room');
@@ -271,51 +250,4 @@ export function isDuplicateTab(): Promise<boolean> {
 			resolve(duplicate);
 		}, PING_TIMEOUT_MS);
 	});
-}
-
-export async function createBackgroundVideo(
-	scene: BABYLON.Scene,
-	isDisposed: () => boolean,
-) {
-	const video = document.createElement('video');
-	video.muted = true;
-	video.loop = true;
-	video.playsInline = true;
-	video.crossOrigin = 'anonymous';
-	video.src = guiImports.testVideo;
-
-	const loaded = await new Promise<boolean>((resolve) => {
-		video.addEventListener('canplay', () => resolve(true), { once: true });
-		video.addEventListener('error', () => resolve(false), { once: true });
-	});
-
-	if (!loaded || isDisposed()) {
-		video.removeAttribute('src');
-		video.load();
-		return null;
-	}
-	const videoTexture = new BABYLON.VideoTexture(
-		'menuTrailer',
-		video,
-		scene,
-		true,
-		false,
-		BABYLON.VideoTexture.TRILINEAR_SAMPLINGMODE,
-		{
-			autoPlay: true,
-			muted: true,
-			loop: true,
-			autoUpdateTexture: true,
-		},
-	);
-
-	const backgroundLayer = new BABYLON.Layer(
-		'menuBackground',
-		null,
-		scene,
-		true,
-	);
-	backgroundLayer.texture = videoTexture;
-
-	return { videoTexture, backgroundLayer };
 }

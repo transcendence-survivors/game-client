@@ -87,7 +87,6 @@ export class MonsterView {
 	private groundHeightAccumulatorS = 0;
 	private cameraOcclusionAccumulatorS = MONSTER_CAMERA_OCCLUSION_INTERVAL_S;
 	private groundHeight = 0;
-	private modelSizeMultiplier = 1;
 	private headAnchor: BABYLON.TransformNode | null = null;
 	private childMeshes: BABYLON.AbstractMesh[] | null = null;
 	private bodyMeasured = false;
@@ -120,7 +119,7 @@ export class MonsterView {
 		this.animationSampleAccumulatorS =
 			(Math.abs(root.uniqueId) % ANIMATION_PHASE_BUCKETS) *
 			(MONSTER_ANIMATION_INTERVAL_S / ANIMATION_PHASE_BUCKETS);
-		this.modelSizeMultiplier =
+		const modelSizeMultiplier =
 			(getMonsterDefinition(kind)?.visualScale ?? 1) *
 			(isElite ? ELITE_MODEL_SCALE : 1);
 		this.animationState = initialAnimationState;
@@ -130,7 +129,7 @@ export class MonsterView {
 		this.root.scaling = this.root.scaling.scale(
 			MONSTER_MODEL_SCALE *
 				(isBoss ? BOSS_MODEL_SCALE : 1) *
-				this.modelSizeMultiplier,
+				modelSizeMultiplier,
 		);
 		if (MONSTER_RENDER_CULLING_CONFIG.forceActiveMeshes)
 			for (const mesh of this.getMeshes()) {
@@ -336,7 +335,23 @@ export class MonsterView {
 			group.play(loop);
 			group.pause();
 		}
-		this.seek(group, timeS, loop);
+		const targeted = group.targetedAnimations[0];
+		if (!targeted) return;
+		group.goToFrame(
+			!loop
+				? Math.min(
+						group.to,
+						group.from +
+							Math.max(0, timeS) *
+								targeted.animation.framePerSecond,
+					)
+				: loopedAnimationFrame(
+						group.from,
+						group.to,
+						targeted.animation.framePerSecond,
+						timeS,
+					),
+		);
 	}
 
 	private updateAnimation(deltaTime: number, combatTimeS: number) {
@@ -379,30 +394,6 @@ export class MonsterView {
 		return Math.max(0, combatTimeS - this.animationStartedAtS);
 	}
 
-	private seek(
-		group: BABYLON.AnimationGroup,
-		timeS: number,
-		loop = true,
-	): void {
-		const targeted = group.targetedAnimations[0];
-		if (!targeted) return;
-		group.goToFrame(
-			!loop
-				? Math.min(
-						group.to,
-						group.from +
-							Math.max(0, timeS) *
-								targeted.animation.framePerSecond,
-					)
-				: loopedAnimationFrame(
-						group.from,
-						group.to,
-						targeted.animation.framePerSecond,
-						timeS,
-					),
-		);
-	}
-
 	private advanceDeath(deltaTime: number, sample: boolean): void {
 		if (!this.deathStarted) return;
 		this.deathElapsedS = Math.min(
@@ -418,10 +409,6 @@ export class MonsterView {
 		camera: BABYLON.Camera | null,
 		animationTimeS: number,
 	) {
-		if (!this.renderEnabled) {
-			this.updateOffscreen(deltaTime);
-			return;
-		}
 		const lerpFactor = Math.min(1, deltaTime * MONSTER_POSITION_LERP_SPEED);
 		const position = this.root.position;
 		position.x = BABYLON.Scalar.Lerp(position.x, this.target.x, lerpFactor);

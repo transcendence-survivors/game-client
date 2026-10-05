@@ -9,6 +9,11 @@ const BUTTON_SIZE = 68;
 const BUTTON_GAP = 20;
 const BUTTON_MARGIN = 24;
 const PRESSED_ALPHA = 0.55;
+const MOBILE_BUTTONS: [MobileAction, string, string, string][] = [
+	['jump', 'MobileJumpButton', '⬆', HUD_THEME.gold],
+	['revive', 'MobileReviveButton', '♥', HUD_THEME.boss],
+	['stats', 'MobileStatsButton', '☰', HUD_THEME.xp],
+];
 
 export class MobileControls {
 	private readonly advTex: GUI.AdvancedDynamicTexture;
@@ -17,35 +22,15 @@ export class MobileControls {
 	constructor(scene: Scene) {
 		this.advTex = createFullscreenUi('MobileControls', scene);
 
-		const jumpButton = this.createButton(
-			'MobileJumpButton',
-			'⬆',
-			HUD_THEME.gold,
-		);
-		jumpButton.leftInPixels = -BUTTON_MARGIN;
-		jumpButton.topInPixels = -BUTTON_MARGIN;
-		this.bindButton(jumpButton, 'jump');
-
-		const reviveButton = this.createButton(
-			'MobileReviveButton',
-			'♥',
-			HUD_THEME.boss,
-		);
-		reviveButton.leftInPixels = -(BUTTON_MARGIN + BUTTON_SIZE + BUTTON_GAP);
-		reviveButton.topInPixels = -BUTTON_MARGIN;
-		this.bindButton(reviveButton, 'revive');
-
-		const statsButton = this.createButton(
-			'MobileStatsButton',
-			'☰',
-			HUD_THEME.xp,
-		);
-		statsButton.leftInPixels = -(
-			BUTTON_MARGIN +
-			2 * (BUTTON_SIZE + BUTTON_GAP)
-		);
-		statsButton.topInPixels = -BUTTON_MARGIN;
-		this.bindButton(statsButton, 'stats');
+		MOBILE_BUTTONS.forEach(([action, name, label, color], index) => {
+			const button = this.createButton(name, label, color);
+			button.leftInPixels = -(
+				BUTTON_MARGIN +
+				index * (BUTTON_SIZE + BUTTON_GAP)
+			);
+			button.topInPixels = -BUTTON_MARGIN;
+			this.bindButton(button, action);
+		});
 	}
 
 	isPressed(action: MobileAction) {

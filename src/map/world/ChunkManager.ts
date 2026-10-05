@@ -1,22 +1,19 @@
-import { Frustum, Plane } from '@babylonjs/core';
+import { Frustum, Plane, type Mesh } from '@babylonjs/core';
 import type { Camera, Scene, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { Vec2d, World } from '@transcendence/game-shared';
-import { TerrainChunk } from './TerrainChunk';
+import { buildChunkMesh } from './TerrainChunk';
 import { WorldGenerationClient } from './WorldGenerationClient';
 import type { TerrainSurfaceData } from './TerrainSurface';
 
 interface LoadedChunk extends Vec2d {
-	chunk: TerrainChunk;
+	mesh: Mesh;
 }
 
 interface PendingBuild extends Readonly<Vec2d> {
 	readonly key: string;
-	readonly generation: number;
 }
 
-interface ReadyChunk extends Readonly<Vec2d> {
-	readonly key: string;
-	readonly generation: number;
+interface ReadyChunk extends PendingBuild {
 	readonly surface: TerrainSurfaceData;
 }
 
@@ -40,7 +37,6 @@ export class ChunkManager {
 	private readonly now: () => number;
 	private queue: Array<[number, number, string]> = [];
 	private queueIndex = 0;
-	private queueGeneration = 0;
 	private activeGenerations = 0;
 	private publishScheduled = false;
 	private readonly frustumPlanes: Plane[] = Array.from(
@@ -87,7 +83,6 @@ export class ChunkManager {
 		if (cellChanged) {
 			this.lastCx = cx;
 			this.lastCz = cz;
-			this.queueGeneration++;
 			this.queue.length = 0;
 			this.queueIndex = 0;
 			for (let dz = -this.view; dz <= this.view; dz++)
@@ -110,7 +105,7 @@ export class ChunkManager {
 					Math.abs(loaded.x - cx) > this.view + 1 ||
 					Math.abs(loaded.z - cz) > this.view + 1
 				) {
-					loaded.chunk.dispose();
+					loaded.mesh.dispose();
 					this.chunks.delete(key);
 				}
 			}
@@ -131,8 +126,7 @@ export class ChunkManager {
 	}
 
 	clear(): void {
-		this.queueGeneration++;
-		for (const loaded of this.chunks.values()) loaded.chunk.dispose();
+		for (const loaded of this.chunks.values()) loaded.mesh.dispose();
 		this.chunks.clear();
 		this.pendingBuilds.clear();
 		for (
@@ -162,15 +156,9 @@ export class ChunkManager {
 			this.activeGenerations < MAX_TERRAIN_GENERATIONS_IN_FLIGHT &&
 			this.queueIndex < this.queue.length
 		) {
-			const next = this.queue[this.queueIndex++]!;
-			const [x, z, key] = next;
+			const [x, z, key] = this.queue[this.queueIndex++]!;
 			if (this.chunks.has(key) || this.pendingBuilds.has(key)) continue;
-			const pending: PendingBuild = {
-				key,
-				x,
-				z,
-				generation: this.queueGeneration,
-			};
+			const pending: PendingBuild = { key, x, z };
 			this.pendingBuilds.set(key, pending);
 			this.activeGenerations++;
 			try {
@@ -199,13 +187,7 @@ export class ChunkManager {
 		}
 		this.pendingBuilds.delete(pending.key);
 		if (!this.disposed && this.isWithinView(pending.x, pending.z))
-			this.readyChunks.push({
-				key: pending.key,
-				x: pending.x,
-				z: pending.z,
-				generation: pending.generation,
-				surface,
-			});
+			this.readyChunks.push({ ...pending, surface });
 		else surface.release?.();
 		this.startQueuedGenerations();
 		this.schedulePublication();
@@ -252,22 +234,15 @@ export class ChunkManager {
 			if (this.now() - startedAt >= TERRAIN_PUBLICATION_BUDGET_MS) break;
 			const ready = this.readyChunks[this.readyChunkHead++]!;
 			if (
-				ready.generation !== this.queueGeneration &&
-				!this.isWithinView(ready.x, ready.z)
-			) {
-				ready.surface.release?.();
-				continue;
-			}
-			if (
 				this.chunks.has(ready.key) ||
 				!this.isWithinView(ready.x, ready.z)
 			) {
 				ready.surface.release?.();
 				continue;
 			}
-			let chunk: TerrainChunk;
+			let mesh: Mesh;
 			try {
-				chunk = new TerrainChunk(
+				mesh = buildChunkMesh(
 					this.scene,
 					this.world,
 					ready.x,
@@ -278,11 +253,7 @@ export class ChunkManager {
 			} finally {
 				ready.surface.release?.();
 			}
-			this.chunks.set(ready.key, {
-				x: ready.x,
-				z: ready.z,
-				chunk,
-			});
+			this.chunks.set(ready.key, { x: ready.x, z: ready.z, mesh });
 			this.visibilityDirty = true;
 			if (
 				Number.isFinite(this.lastVisibilityCenterX) &&
@@ -297,9 +268,7 @@ export class ChunkManager {
 		if (this.readyChunkHead >= this.readyChunks.length) {
 			this.readyChunks.length = 0;
 			this.readyChunkHead = 0;
-		}
-		if (this.readyChunkHead < this.readyChunks.length)
-			this.schedulePublication();
+		} else this.schedulePublication();
 	}
 
 	private updateVisibility(centerX: number, centerZ: number): void {
@@ -329,9 +298,9 @@ export class ChunkManager {
 					loaded.z,
 					centerX,
 					centerZ,
-				) && loaded.chunk.mesh.isInFrustum(this.frustumPlanes);
-			if (loaded.chunk.mesh.isEnabled() !== visible)
-				loaded.chunk.mesh.setEnabled(visible);
+				) && loaded.mesh.isInFrustum(this.frustumPlanes);
+			if (loaded.mesh.isEnabled() !== visible)
+				loaded.mesh.setEnabled(visible);
 		}
 
 		this.lastVisibilityCamera = camera;
@@ -352,12 +321,8 @@ export class ChunkManager {
 		const maxX = minX + this.size;
 		const minZ = chunkZ * this.size;
 		const maxZ = minZ + this.size;
-		const closestX =
-			centerX < minX ? minX : centerX > maxX ? maxX : centerX;
-		const closestZ =
-			centerZ < minZ ? minZ : centerZ > maxZ ? maxZ : centerZ;
-		const dx = closestX - centerX;
-		const dz = closestZ - centerZ;
+		const dx = Math.max(minX - centerX, 0, centerX - maxX);
+		const dz = Math.max(minZ - centerZ, 0, centerZ - maxZ);
 		return dx * dx + dz * dz <= this.displayRadiusSquared;
 	}
 }

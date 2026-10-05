@@ -10,7 +10,6 @@ import {
 } from '@transcendence/game-shared';
 import { GROUND_TEXTURE_WORLD_SIZE } from './ProceduralGroundTexture';
 import {
-	generateTerrainSurface,
 	terrainSurfaceSegments,
 	type TerrainSurfaceData,
 } from './TerrainSurface';
@@ -105,11 +104,7 @@ export function buildChunkMesh(
 	chunkX: number,
 	chunkZ: number,
 	mat: StandardMaterial,
-	surfaceData: TerrainSurfaceData = generateTerrainSurface(
-		world,
-		chunkX,
-		chunkZ,
-	),
+	surfaceData: TerrainSurfaceData,
 ): Mesh {
 	const cellSize = world.CELL;
 	const segments = terrainSurfaceSegments(world);
@@ -167,24 +162,5 @@ export function buildChunkMesh(
 		releaseBuffers();
 		mesh?.dispose();
 		throw error;
-	}
-}
-
-export class TerrainChunk {
-	readonly mesh: Mesh;
-
-	constructor(
-		scene: Scene,
-		world: World,
-		cx: number,
-		cz: number,
-		mat: StandardMaterial,
-		surfaceData?: TerrainSurfaceData,
-	) {
-		this.mesh = buildChunkMesh(scene, world, cx, cz, mat, surfaceData);
-	}
-
-	dispose(): void {
-		this.mesh.dispose();
 	}
 }

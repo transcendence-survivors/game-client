@@ -27,19 +27,12 @@ const REBIND_ACTIONS = KEY_ACTIONS.filter(
 
 type KeyButtons = Record<RebindAction, GUI.Button>;
 
-const KEY_BUTTON_NAMES: { [K in keyof KeyBindings]: string } = {
-	forward: 'Key_Forward',
-	backward: 'Key_Backward',
-	right: 'Key_Right',
-	left: 'Key_Left',
-	jump: 'Key_Jump',
-	stats: 'Key_Stats',
-	revive: 'Key_Revive',
-	upgrade1: 'Key_Upgrade1',
-	upgrade2: 'Key_Upgrade2',
-	upgrade3: 'Key_Upgrade3',
-	fov: 'FovSlider',
-};
+const KEY_BUTTON_NAMES = Object.fromEntries(
+	REBIND_ACTIONS.map((action) => [
+		action,
+		`Key_${action[0]!.toUpperCase()}${action.slice(1)}`,
+	]),
+) as Record<RebindAction, string>;
 
 export class SettingsMenuRender {
 	private readonly scene: Scene;
@@ -89,16 +82,13 @@ export class SettingsMenuRender {
 	}
 
 	private loadKeybindings(): KeyBindings {
+		const result = { ...DEFAULT_KEY_BINDINGS };
 		try {
 			const raw = localStorage.getItem(STORAGE_KEY);
-			if (!raw) {
-				return { ...DEFAULT_KEY_BINDINGS };
-			}
+			if (!raw) return result;
 			const parsed = JSON.parse(raw);
-			if (typeof parsed !== 'object' || parsed === null)
-				return { ...DEFAULT_KEY_BINDINGS };
+			if (typeof parsed !== 'object' || parsed === null) return result;
 
-			const result = { ...DEFAULT_KEY_BINDINGS };
 			for (const action of REBIND_ACTIONS) {
 				const value = (parsed as Record<string, unknown>)[action];
 				if (typeof value === 'string' && value.length > 0) {

@@ -182,7 +182,7 @@ export class ServerOrchestrator {
 	setPlayer(player: BABYLON.AbstractMesh) {
 		this.player = player;
 		this.hasLastReconciliation = false;
-		this.weaponAttachments.attachToPlayer(this.room.sessionId);
+		this.weaponAttachments.resetPlayer(this.room.sessionId);
 	}
 
 	sendMovementInput(input: MoveInput): void {
@@ -234,7 +234,7 @@ export class ServerOrchestrator {
 		});
 		const view = this.remotePlayers.get(sessionId);
 		if (!view) return null;
-		this.weaponAttachments.attachToPlayer(sessionId);
+		this.weaponAttachments.resetPlayer(sessionId);
 		return view;
 	}
 
@@ -259,7 +259,7 @@ export class ServerOrchestrator {
 	}
 
 	private removeRemotePlayer(sessionId: string) {
-		this.weaponAttachments.removePlayer(sessionId);
+		this.weaponAttachments.resetPlayer(sessionId);
 		this.remotePlayers.remove(sessionId);
 		this.remoteTargets.delete(sessionId);
 	}

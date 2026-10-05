@@ -9,6 +9,18 @@ import { fbm2d, smoothstep } from './ProceduralNoise';
 
 const GROUND_TEXTURE_SIZE = 512;
 export const GROUND_TEXTURE_WORLD_SIZE = 1024;
+// One row per RGB channel: meadow, forest, rocky, path as [base, a, b].
+// prettier-ignore
+const GROUND_COLORS = [
+	82, 20, 8,   34, 11, 5,   124, 18, 6,   171, 26, 5,
+	172, 29, 13,   108, 24, 10,   137, 20, 8,   133, 23, 8,
+	58, 15, 7,   36, 10, 5,   88, 14, 6,   55, 15, 5,
+];
+
+function tint(offset: number, a: number, b: number): number {
+	const k = GROUND_COLORS;
+	return k[offset] + a * k[offset + 1] + b * k[offset + 2];
+}
 
 function channel(value: number): number {
 	return Math.max(0, Math.min(255, Math.round(value)));
@@ -37,7 +49,7 @@ export function createProceduralGroundTextureData(seed: number): Uint8Array {
 				z * 0.14 - 9,
 				seed ^ 0xa5a5a5a5,
 			);
-			const path = groundPathFactor(x, z, seed, pathParameters);
+			const path = groundPathFactor(x, z, pathParameters);
 			const pathVariation = fbm2d(
 				x * 0.055 - 3,
 				z * 0.055 + 11,
@@ -65,41 +77,16 @@ export function createProceduralGroundTextureData(seed: number): Uint8Array {
 				(0.55 + 0.45 * (fineVariation * 0.5 + 0.5));
 
 			const shade = 1 - cracks * 0.42;
-			const groundR =
-				(82 + grassVariation * 20 + fineVariation * 8) * biome.meadow +
-				(34 + grassVariation * 11 + fineVariation * 5) * biome.forest +
-				(124 + grassVariation * 18 + fineVariation * 6) * biome.rocky;
-			const groundG =
-				(172 + grassVariation * 29 + fineVariation * 13) *
-					biome.meadow +
-				(108 + grassVariation * 24 + fineVariation * 10) *
-					biome.forest +
-				(137 + grassVariation * 20 + fineVariation * 8) * biome.rocky;
-			const groundB =
-				(58 + grassVariation * 15 + fineVariation * 7) * biome.meadow +
-				(36 + grassVariation * 10 + fineVariation * 5) * biome.forest +
-				(88 + grassVariation * 14 + fineVariation * 6) * biome.rocky;
-			data[index] = channel(
-				lerp(
-					groundR,
-					171 + pathVariation * 26 + fineVariation * 5,
-					path,
-				) * shade,
-			);
-			data[index + 1] = channel(
-				lerp(
-					groundG,
-					133 + pathVariation * 23 + fineVariation * 8,
-					path,
-				) * shade,
-			);
-			data[index + 2] = channel(
-				lerp(
-					groundB,
-					55 + pathVariation * 15 + fineVariation * 5,
-					path,
-				) * shade,
-			);
+			for (let c = 0, k = 0; c < 3; c++, k += 12) {
+				const ground =
+					tint(k, grassVariation, fineVariation) * biome.meadow +
+					tint(k + 3, grassVariation, fineVariation) * biome.forest +
+					tint(k + 6, grassVariation, fineVariation) * biome.rocky;
+				const pathColor = tint(k + 9, pathVariation, fineVariation);
+				data[index + c] = channel(
+					lerp(ground, pathColor, path) * shade,
+				);
+			}
 			data[index + 3] = 255;
 			index += 4;
 		}

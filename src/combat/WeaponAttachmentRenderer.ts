@@ -88,19 +88,22 @@ export class WeaponAttachmentRenderer {
 			const config = ATTACK_ANIMATIONS[weapon];
 			const easing = new BABYLON.QuadraticEase();
 			easing.setEasingMode(config.easingMode);
-			this.attackAnimations.set(
-				weapon,
-				this.floatAnimation(
-					config.name,
-					config.property,
-					config.keys,
-					easing,
-				),
+			const animation = new BABYLON.Animation(
+				config.name,
+				config.property,
+				60,
+				BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+				BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT,
 			);
+			animation.setKeys(
+				config.keys.map(([frame, value]) => ({ frame, value })),
+			);
+			animation.setEasingFunction(easing);
+			this.attackAnimations.set(weapon, animation);
 		}
 	}
 
-	attachToPlayer(playerId: string): void {
+	resetPlayer(playerId: string): void {
 		const generation = (this.generations.get(playerId) ?? 0) + 1;
 		this.generations.set(playerId, generation);
 		this.disposeRoots(playerId);
@@ -116,14 +119,6 @@ export class WeaponAttachmentRenderer {
 		const generation = this.generations.get(playerId);
 		if (generation === undefined) return;
 		void this.attach(weapon, playerId, player, generation);
-	}
-
-	removePlayer(playerId: string): void {
-		this.generations.set(
-			playerId,
-			(this.generations.get(playerId) ?? 0) + 1,
-		);
-		this.disposeRoots(playerId);
 	}
 
 	playAttack(playerId: string, weapon: WeaponKind): void {
@@ -144,24 +139,6 @@ export class WeaponAttachmentRenderer {
 				if (!root.isDisposed()) config.reset(root);
 			},
 		);
-	}
-
-	private floatAnimation(
-		name: string,
-		property: string,
-		keys: ReadonlyArray<readonly [frame: number, value: number]>,
-		easing: BABYLON.EasingFunction,
-	): BABYLON.Animation {
-		const animation = new BABYLON.Animation(
-			name,
-			property,
-			60,
-			BABYLON.Animation.ANIMATIONTYPE_FLOAT,
-			BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT,
-		);
-		animation.setKeys(keys.map(([frame, value]) => ({ frame, value })));
-		animation.setEasingFunction(easing);
-		return animation;
 	}
 
 	dispose(): void {
@@ -197,27 +174,22 @@ export class WeaponAttachmentRenderer {
 			return;
 		}
 		let root = modelRoot;
-		if (weapon === 'sword') {
+		if (weapon !== 'staff') {
 			root = new BABYLON.TransformNode(
-				`swordPivot:${playerId}`,
+				`${weapon}Pivot:${playerId}`,
 				modelRoot.getScene(),
 			);
 			modelRoot.parent = root;
 			modelRoot.rotationQuaternion = null;
-			modelRoot.position.set(0, 0, SWORD_POMMEL_OFFSET);
-			modelRoot.rotation.set(Math.PI / 2, 0, 0);
-		} else if (weapon === 'bow') {
-			root = new BABYLON.TransformNode(
-				`bowPivot:${playerId}`,
-				modelRoot.getScene(),
-			);
-			modelRoot.parent = root;
-			modelRoot.rotationQuaternion = null;
-			modelRoot.rotation.set(
-				BOW_HORIZONTAL_PITCH,
-				0,
-				BOW_HORIZONTAL_ROLL,
-			);
+			if (weapon === 'sword') {
+				modelRoot.position.set(0, 0, SWORD_POMMEL_OFFSET);
+				modelRoot.rotation.set(Math.PI / 2, 0, 0);
+			} else
+				modelRoot.rotation.set(
+					BOW_HORIZONTAL_PITCH,
+					0,
+					BOW_HORIZONTAL_ROLL,
+				);
 		}
 		root.rotationQuaternion = null;
 		root.parent = player;

@@ -50,6 +50,7 @@ interface HudControls {
 	downedHint: GUI.TextBlock;
 }
 
+type HudSection = 'team' | 'weapons' | 'tomes' | 'boss' | 'player' | 'kills';
 type StateCallbacks = ReturnType<typeof COLYSEUS.Callbacks.get<GameState>>;
 
 interface ItemSlotControls {
@@ -92,6 +93,40 @@ const compareIds = (first: string, second: string): number =>
 const TOME_ICONS = new Map(
 	TOME_DEFINITIONS.map(({ id, iconUrl }) => [id, iconUrl] as const),
 );
+const LEFT = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+const RIGHT = GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+
+function placeHudText(
+	parent: GUI.Container,
+	text: GUI.TextBlock,
+	align: number,
+	[width, height, left, top]: [number, number, number?, number?],
+): GUI.TextBlock {
+	text.fontWeight = 'bold';
+	text.width = `${width}px`;
+	text.height = `${height}px`;
+	if (left !== undefined) text.left = `${left}px`;
+	if (top !== undefined) text.top = `${top}px`;
+	text.horizontalAlignment = align;
+	text.textHorizontalAlignment = align;
+	text.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
+	parent.addControl(text);
+	return text;
+}
+
+function createHudHeader(
+	parent: GUI.Container,
+	name: string,
+	label: string,
+	color: string,
+	count: string,
+	[width, countWidth, height, top]: [number, number, number, number],
+): GUI.TextBlock {
+	const title = hudText(`${name}Label`, label.toUpperCase(), 11, color);
+	placeHudText(parent, title, LEFT, [width, height, 12, top]);
+	const text = hudText(`${name}Count`, count, 11, HUD_THEME.muted);
+	return placeHudText(parent, text, RIGHT, [countWidth, height, -12, top]);
+}
 
 export class Hud {
 	private readonly advTex: GUI.AdvancedDynamicTexture;
@@ -103,31 +138,23 @@ export class Hud {
 	private readonly teammateIds: string[] = [];
 	private activeBossId = '';
 	private reviveKeyLabel = '';
-	private teamDirty = true;
-	private weaponsDirty = true;
-	private tomesDirty = true;
-	private bossDirty = true;
-	private playerDirty = true;
-	private killsDirty = true;
+	private readonly dirty = new Set<HudSection>([
+		'team',
+		'weapons',
+		'tomes',
+		'boss',
+		'player',
+		'kills',
+	]);
 	private lastTimerSecond = Number.NaN;
-	private readonly markPlayerDirty = (): void => {
-		this.playerDirty = true;
-	};
-	private readonly markTeamDirty = (): void => {
-		this.teamDirty = true;
-	};
-	private readonly markWeaponsDirty = (): void => {
-		this.weaponsDirty = true;
-	};
-	private readonly markTomesDirty = (): void => {
-		this.tomesDirty = true;
-	};
-	private readonly markBossDirty = (): void => {
-		this.bossDirty = true;
-	};
-	private readonly markKillsDirty = (): void => {
-		this.killsDirty = true;
-	};
+	private readonly markPlayerDirty = (): void =>
+		void this.dirty.add('player');
+	private readonly markTeamDirty = (): void => void this.dirty.add('team');
+	private readonly markWeaponsDirty = (): void =>
+		void this.dirty.add('weapons');
+	private readonly markTomesDirty = (): void => void this.dirty.add('tomes');
+	private readonly markBossDirty = (): void => void this.dirty.add('boss');
+	private readonly markKillsDirty = (): void => void this.dirty.add('kills');
 
 	constructor(scene: Scene, room: COLYSEUS.Room<GameState>) {
 		this.room = room;
@@ -148,10 +175,8 @@ export class Hud {
 			callbacks.onRemove('players', (_player, sessionId) => {
 				this.playerSubscriptions.delete(sessionId);
 				if (sessionId === this.room.sessionId) {
-					this.weaponsDirty = true;
-					this.tomesDirty = true;
-					this.playerDirty = true;
-				} else this.teamDirty = true;
+					this.dirty.add('weapons').add('tomes').add('player');
+				} else this.dirty.add('team');
 			}),
 		);
 		this.subscriptions.add(
@@ -174,7 +199,6 @@ export class Hud {
 	}
 
 	private updateKillHud() {
-		this.killsDirty = false;
 		this.controls.killText.text = String(this.room.state.totalKills);
 	}
 
@@ -282,40 +306,14 @@ export class Hud {
 		styleHudPanel(teamPanel, HUD_THEME.xp);
 		root.addControl(teamPanel);
 
-		const teamLabel = hudText(
-			'NetworkTeamLabel',
-			gameI18n.t('hud.onlineTeam').toUpperCase(),
-			11,
+		const teamCountText = createHudHeader(
+			teamPanel,
+			'NetworkTeam',
+			gameI18n.t('hud.onlineTeam'),
 			HUD_THEME.xp,
-		);
-		teamLabel.fontWeight = 'bold';
-		teamLabel.width = '150px';
-		teamLabel.height = '22px';
-		teamLabel.left = '12px';
-		teamLabel.top = '7px';
-		teamLabel.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-		teamLabel.textHorizontalAlignment =
-			GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-		teamLabel.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-		teamPanel.addControl(teamLabel);
-
-		const teamCountText = hudText(
-			'NetworkTeamCount',
 			'1 / 4',
-			11,
-			HUD_THEME.muted,
+			[150, 60, 22, 7],
 		);
-		teamCountText.fontWeight = 'bold';
-		teamCountText.width = '60px';
-		teamCountText.height = '22px';
-		teamCountText.left = '-12px';
-		teamCountText.top = '7px';
-		teamCountText.horizontalAlignment =
-			GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
-		teamCountText.textHorizontalAlignment =
-			GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
-		teamCountText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-		teamPanel.addControl(teamCountText);
 
 		const teammateSlots = Array.from(
 			{ length: COMBAT_LIMITS.maxPlayers - 1 },
@@ -581,39 +579,14 @@ export class Hud {
 			HUD_SCALE,
 		);
 
-		const labelText = hudText(
-			`${name}Label`,
-			label.toUpperCase(),
-			11,
+		const countText = createHudHeader(
+			panel,
+			name,
+			label,
 			HUD_THEME.gold,
-		);
-		labelText.fontWeight = 'bold';
-		labelText.width = '120px';
-		labelText.height = '20px';
-		labelText.left = '12px';
-		labelText.top = '5px';
-		labelText.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-		labelText.textHorizontalAlignment =
-			GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-		labelText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-		panel.addControl(labelText);
-
-		const countText = hudText(
-			`${name}Count`,
 			`0 / ${capacity}`,
-			11,
-			HUD_THEME.muted,
+			[120, 70, 20, 5],
 		);
-		countText.fontWeight = 'bold';
-		countText.width = '70px';
-		countText.height = '20px';
-		countText.left = '-12px';
-		countText.top = '5px';
-		countText.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
-		countText.textHorizontalAlignment =
-			GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
-		countText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-		panel.addControl(countText);
 
 		const row = new GUI.StackPanel(`${slotName}s`);
 		row.isVertical = false;
@@ -663,35 +636,28 @@ export class Hud {
 		status.isHitTestVisible = false;
 		panel.addControl(status);
 
-		const name = hudText(
-			`NetworkTeammate${index}Name`,
-			gameI18n.t('hud.ally', { number: index + 1 }).toUpperCase(),
-			11,
-			HUD_THEME.text,
+		const name = placeHudText(
+			panel,
+			hudText(
+				`NetworkTeammate${index}Name`,
+				gameI18n.t('hud.ally', { number: index + 1 }).toUpperCase(),
+				11,
+				HUD_THEME.text,
+			),
+			LEFT,
+			[130, 21, 16],
 		);
-		name.fontWeight = 'bold';
-		name.width = '130px';
-		name.height = '21px';
-		name.left = '16px';
-		name.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-		name.textHorizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-		name.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-		panel.addControl(name);
-
-		const healthText = hudText(
-			`NetworkTeammate${index}HealthText`,
-			'100 / 100',
-			10,
-			HUD_THEME.text,
+		const healthText = placeHudText(
+			panel,
+			hudText(
+				`NetworkTeammate${index}HealthText`,
+				'100 / 100',
+				10,
+				HUD_THEME.text,
+			),
+			RIGHT,
+			[90, 21],
 		);
-		healthText.fontWeight = 'bold';
-		healthText.width = '90px';
-		healthText.height = '21px';
-		healthText.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
-		healthText.textHorizontalAlignment =
-			GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
-		healthText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
-		panel.addControl(healthText);
 
 		const healthBar = createHudBar(
 			`NetworkTeammate${index}HealthBar`,
@@ -778,18 +744,17 @@ export class Hud {
 			this.lastTimerSecond = timerSecond;
 			this.controls.timerText.text = formatGameTime(timerSecond);
 		}
-		if (this.bossDirty) this.updateBossHealth();
-		if (this.killsDirty) this.updateKillHud();
+		if (this.dirty.delete('boss')) this.updateBossHealth();
+		if (this.dirty.delete('kills')) this.updateKillHud();
 		const player = this.room.state.players.get(this.room.sessionId);
 		if (!player) return;
-		if (this.teamDirty) this.updateTeamHud();
-		if (this.weaponsDirty) this.updateWeaponHud(player);
-		if (this.tomesDirty) this.updateTomeHud(player);
-		if (this.playerDirty) this.updatePlayerHud(player);
+		if (this.dirty.delete('team')) this.updateTeamHud();
+		if (this.dirty.delete('weapons')) this.updateWeaponHud(player);
+		if (this.dirty.delete('tomes')) this.updateTomeHud(player);
+		if (this.dirty.delete('player')) this.updatePlayerHud(player);
 	}
 
 	private updatePlayerHud(player: Player): void {
-		this.playerDirty = false;
 		this.controls.downedPanel.isVisible = player.isDowned;
 		const { hpBar, hpText, xpBar, xpText, levelText, killText } =
 			this.controls;
@@ -804,7 +769,6 @@ export class Hud {
 	}
 
 	private updateTeamHud(): void {
-		this.teamDirty = false;
 		const { teamPanel, teamCountText, teammateSlots } = this.controls;
 		const teammateIds = this.teammateIds;
 		teammateIds.length = 0;
@@ -834,7 +798,6 @@ export class Hud {
 	}
 
 	private updateWeaponHud(player: Player): void {
-		this.weaponsDirty = false;
 		const { weaponCountText, weaponSlots } = this.controls;
 		let slotIndex = 0;
 		for (const kind of WEAPON_KINDS) {
@@ -871,7 +834,6 @@ export class Hud {
 	}
 
 	private updateTomeHud(player: Player): void {
-		this.tomesDirty = false;
 		const { tomeCountText, tomeSlots } = this.controls;
 		const { tomeLevels } = player.stats;
 		if (!tomeLevels) return;
@@ -928,7 +890,6 @@ export class Hud {
 	}
 
 	private updateBossHealth(): void {
-		this.bossDirty = false;
 		const {
 			bossPanel: panel,
 			bossName: name,

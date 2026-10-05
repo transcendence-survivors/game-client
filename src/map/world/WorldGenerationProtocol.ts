@@ -38,24 +38,29 @@ export function isSharedGenerationBuffer(
 	);
 }
 
-export function writeGenerationReady(
-	header: Int32Array,
+export function writeGenerationHeader(
+	buffer: GenerationBuffer,
+	status: number,
 	count: number,
-	shared: boolean,
 ): void {
-	if (shared) {
+	const header = new Int32Array(buffer, 0, 2);
+	if (isSharedGenerationBuffer(buffer)) {
 		Atomics.store(header, GENERATION_COUNT_INDEX, count);
-		Atomics.store(header, GENERATION_STATUS_INDEX, GENERATION_READY);
-		return;
+		Atomics.store(header, GENERATION_STATUS_INDEX, status);
+	} else {
+		header[GENERATION_COUNT_INDEX] = count;
+		header[GENERATION_STATUS_INDEX] = status;
 	}
-	header[GENERATION_COUNT_INDEX] = count;
-	header[GENERATION_STATUS_INDEX] = GENERATION_READY;
 }
 
-export function readGenerationCount(
-	header: Int32Array,
-	shared: boolean,
-): number {
+export function readGenerationCount(buffer: GenerationBuffer): number {
+	const header = new Int32Array(buffer, 0, 2);
+	const shared = isSharedGenerationBuffer(buffer);
+	const status = shared
+		? Atomics.load(header, GENERATION_STATUS_INDEX)
+		: header[GENERATION_STATUS_INDEX];
+	if (status !== GENERATION_READY)
+		throw new Error('World generation did not complete');
 	return shared
 		? Atomics.load(header, GENERATION_COUNT_INDEX)
 		: header[GENERATION_COUNT_INDEX]!;

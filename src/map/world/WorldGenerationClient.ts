@@ -8,11 +8,9 @@ import {
 	FOREST_PLACEMENT_CAPACITY,
 	FOREST_PLACEMENT_STRIDE,
 	GENERATION_HEADER_BYTES,
-	GENERATION_READY,
-	GENERATION_COUNT_INDEX,
-	GENERATION_STATUS_INDEX,
 	readGenerationCount,
 	isSharedGenerationBuffer,
+	writeGenerationHeader,
 	TERRAIN_SURFACE_STRIDE,
 	type GenerationBuffer,
 	type GenerationResponse,
@@ -45,17 +43,6 @@ function supportsSharedBuffers(): boolean {
 		typeof globalThis.crossOriginIsolated === 'boolean' &&
 		globalThis.crossOriginIsolated
 	);
-}
-
-function readReadyCount(buffer: GenerationBuffer): number {
-	const header = new Int32Array(buffer, 0, 2);
-	const shared = isSharedGenerationBuffer(buffer);
-	const status = shared
-		? Atomics.load(header, GENERATION_STATUS_INDEX)
-		: header[GENERATION_STATUS_INDEX];
-	if (status !== GENERATION_READY)
-		throw new Error('World generation did not complete');
-	return readGenerationCount(header, shared);
 }
 
 function deferToTask<T>(work: () => T): Promise<T> {
@@ -177,14 +164,7 @@ export class WorldGenerationClient {
 		const pooled = this.bufferPool.get(byteLength);
 		const reused = pooled?.pop();
 		if (reused) {
-			const header = new Int32Array(reused, 0, 2);
-			if (isSharedGenerationBuffer(reused)) {
-				Atomics.store(header, GENERATION_STATUS_INDEX, 0);
-				Atomics.store(header, GENERATION_COUNT_INDEX, 0);
-			} else {
-				header[GENERATION_STATUS_INDEX] = 0;
-				header[GENERATION_COUNT_INDEX] = 0;
-			}
+			writeGenerationHeader(reused, 0, 0);
 			return reused;
 		}
 		return this.sharedBuffersEnabled
@@ -282,7 +262,7 @@ export class WorldGenerationClient {
 	private readonly decodePackedForest = (
 		buffer: GenerationBuffer,
 	): ForestPlacementBuffer => {
-		const count = readReadyCount(buffer);
+		const count = readGenerationCount(buffer);
 		if (count < 0 || count > FOREST_PLACEMENT_CAPACITY)
 			throw new Error(`Invalid forest placement count: ${count}`);
 		const output = new Float64Array(buffer, GENERATION_HEADER_BYTES);
@@ -298,7 +278,7 @@ export class WorldGenerationClient {
 		buffer: GenerationBuffer,
 		vertexCount: number,
 	): TerrainSurfaceData => {
-		if (readReadyCount(buffer) !== vertexCount)
+		if (readGenerationCount(buffer) !== vertexCount)
 			throw new Error('Invalid terrain vertex count');
 		const output = new Float32Array(buffer, GENERATION_HEADER_BYTES);
 		return {

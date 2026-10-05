@@ -9,7 +9,6 @@ export interface AuraInstance extends Vec2d {
 }
 
 export class PlayerAuraPlugin extends BABYLON.MaterialPluginBase {
-	private _enabled = true;
 	private readonly _auraData = new Float32Array(MAX_AURAS * 4);
 	private _count = 0;
 	private _time = 0;
@@ -19,16 +18,6 @@ export class PlayerAuraPlugin extends BABYLON.MaterialPluginBase {
 	constructor(material: BABYLON.Material) {
 		super(material, 'PlayerAura', 250, { PLAYER_AURA: false });
 		this._enable(true);
-	}
-
-	get isEnabled(): boolean {
-		return this._enabled;
-	}
-	set isEnabled(value: boolean) {
-		if (this._enabled === value) return;
-		this._enabled = value;
-		this.markAllDefinesAsDirty();
-		this._enable(value);
 	}
 
 	update(auras: readonly AuraInstance[], dtSeconds: number): void {
@@ -47,7 +36,7 @@ export class PlayerAuraPlugin extends BABYLON.MaterialPluginBase {
 	}
 
 	prepareDefines(defines: BABYLON.MaterialDefines): void {
-		defines['PLAYER_AURA'] = this._enabled;
+		defines['PLAYER_AURA'] = true;
 	}
 
 	getClassName(): string {
@@ -75,7 +64,6 @@ uniform vec4 auraParams;
 	}
 
 	bindForSubMesh(uniformBuffer: BABYLON.UniformBuffer): void {
-		if (!this._enabled) return;
 		uniformBuffer.updateFloatArray('auraData', this._auraData);
 		uniformBuffer.updateColor3('auraColor', this.color);
 		uniformBuffer.updateFloat4('auraParams', this._count, this._time, 0, 0);
