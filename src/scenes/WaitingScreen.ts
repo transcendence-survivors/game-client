@@ -52,7 +52,7 @@ export class WaitingScreen {
 		this.videoTexture = bg.videoTexture;
 		this.backgroundLayer = bg.backgroundLayer;
 		await this.advTex.parseFromURLAsync(guiImports.waitingScreen);
-		setText(this.advTex, 'ReadyText', gameI18n.t('waiting.notReady'));
+		setText(this.advTex, 'ReadyText', gameI18n.t('waiting.ready'));
 		this.fillData();
 		this.connectButtons();
 		this.connectTitleButton();
@@ -166,18 +166,15 @@ export class WaitingScreen {
 			'ReadyButton',
 		) as GUI.Button;
 
-		const text = this.advTex.getControlByName('ReadyText') as GUI.TextBlock;
 		button.onPointerDownObservable.add(() => {
 			const player = this.room.state.players.get(this.room.sessionId);
 			if (!player) {
 				console.error(`Can't get player`);
 				return;
 			}
+			button.isEnabled = false;
 			const newReady = !player.ready;
 			this.room.send('ready', newReady);
-			text.text = gameI18n.t(
-				newReady ? 'waiting.notReady' : 'waiting.ready',
-			);
 		});
 	}
 }
