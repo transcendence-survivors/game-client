@@ -133,8 +133,6 @@ const en = {
 	'debug.skinning': 'Skinning:',
 	'debug.animationCpu': 'Anim. CPU:',
 	'debug.monsters': 'Monsters:',
-	'debug.testTools': 'Test tools',
-	'debug.hitboxes': '3D hitboxes',
 	'debug.notAvailable': 'N/A',
 	'debug.monsterSummary':
 		'{total} ({elites} elites / {bosses} bosses / {rendered} visible)',

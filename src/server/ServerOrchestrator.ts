@@ -128,7 +128,6 @@ export class ServerOrchestrator {
 	private pendingInputHead = 0;
 	private readonly unsentPredictionInput = createMoveInput();
 	private readonly playerAssets: ModelAssetLibrary;
-	private combatHitboxesVisible = false;
 	private readonly auras: AuraInstance[] = [];
 	private readonly subscriptions = new CleanupBag();
 	private readonly playerSubscriptions = new CleanupRegistry<string>();
@@ -187,11 +186,6 @@ export class ServerOrchestrator {
 		pending.jump = false;
 		pending.deltaTime = deltaTime;
 		pending.cameraYaw = input.cameraYaw;
-	}
-
-	setCombatHitboxesVisible(visible: boolean) {
-		this.combatHitboxesVisible = visible;
-		this.combatRenderer?.setHitboxesVisible(visible);
 	}
 
 	setReviveIntent(enabled: boolean) {
@@ -281,7 +275,6 @@ export class ServerOrchestrator {
 			this.weaponAttachments,
 		);
 		this.combatRenderer.listen();
-		this.combatRenderer.setHitboxesVisible(this.combatHitboxesVisible);
 		this.subscriptions.add(
 			this.room.onMessage(ServerMessage.GameOver, () => {
 				if (this.gameOverHandled) return;

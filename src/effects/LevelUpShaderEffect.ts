@@ -122,6 +122,8 @@ export class LevelUpShaderEffect {
 		this.mesh.material = this.material;
 		this.mesh.isPickable = false;
 		this.mesh.renderingGroupId = 2;
+		// Keep the world depth: the lighting post-processes read it after this group renders.
+		scene.setRenderingAutoClearDepthStencil(2, false, false, false);
 		this.mesh.setEnabled(false);
 
 		this.cleanups.add(

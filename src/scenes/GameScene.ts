@@ -7,7 +7,7 @@ import { MapGenerator } from '../map/MapGenerator';
 import { DebugMenu } from '../hud/DebugMenu';
 import { ServerOrchestrator } from '../server/ServerOrchestrator';
 import { ForestRenderer } from '../map/nature/ForestRenderer';
-import { MonsterRenderer } from '../monsters';
+import { MonsterRenderer } from '../monsters/MonsterRenderer';
 
 import {
 	type MovementBoundary,
@@ -152,10 +152,6 @@ export class GameScene {
 				new DebugMenu(
 					this.engine,
 					this.scene,
-					(visible) => {
-						this.monsters?.setHitboxesVisible(visible);
-						this.server.setCombatHitboxesVisible(visible);
-					},
 					!urlParams.has('noDebug'),
 					() =>
 						this.monsters?.getDebugStats() ?? {
@@ -186,9 +182,6 @@ export class GameScene {
 				new MonsterRenderer(this.scene, room, this.mapGen),
 			);
 			this.monsters.listen();
-			const hitboxesVisible = this.debugMenu.areHitboxesVisible();
-			this.monsters.setHitboxesVisible(hitboxesVisible);
-			this.server.setCombatHitboxesVisible(hitboxesVisible);
 
 			this.hud = this.track(new Hud(this.scene, room));
 			this.statsPanel = this.track(new StatsPanel(this.scene, room));

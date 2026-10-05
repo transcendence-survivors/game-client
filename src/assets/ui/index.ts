@@ -3,7 +3,6 @@ import * as GUI from '@babylonjs/gui';
 
 export const guiImports = {
 	lobby: new URL('./lobby_ui.json', import.meta.url).href,
-	main: new URL('./main_menu.json', import.meta.url).href,
 	settings: new URL('./settings_menu.json', import.meta.url).href,
 	levelup: new URL('./level_up_menu.json', import.meta.url).href,
 	endingScreen: new URL('./ending_screen.json', import.meta.url).href,
@@ -36,11 +35,4 @@ export function getGuiControls<T>(
 			return [key, control];
 		}),
 	) as T;
-}
-
-export function getGuiControl<T extends GUI.Control>(
-	ui: GUI.AdvancedDynamicTexture,
-	name: string,
-): T {
-	return getGuiControls<{ control: T }>(ui, { control: name }).control;
 }

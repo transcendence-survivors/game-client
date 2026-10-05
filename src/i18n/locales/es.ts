@@ -136,8 +136,6 @@ const es = {
 	'debug.skinning': 'Deformación:',
 	'debug.animationCpu': 'Anim. CPU:',
 	'debug.monsters': 'Monstruos:',
-	'debug.testTools': 'Herramientas de prueba',
-	'debug.hitboxes': 'Cajas de colisión 3D',
 	'debug.notAvailable': 'N/D',
 	'debug.monsterSummary':
 		'{total} ({elites} élites / {bosses} jefes / {rendered} visibles)',

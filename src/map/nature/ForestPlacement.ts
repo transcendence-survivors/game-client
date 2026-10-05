@@ -430,12 +430,6 @@ class PackedForestPlacements {
 		]!;
 	}
 
-	biomeAt(index: number): ForestBiome {
-		return FOREST_BIOMES[
-			Math.trunc(this.data[index * FOREST_PLACEMENT_STRIDE + 1]!)
-		]!;
-	}
-
 	xAt(index: number): number {
 		return this.data[index * FOREST_PLACEMENT_STRIDE + 2]!;
 	}

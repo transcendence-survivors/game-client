@@ -29,10 +29,6 @@ export class UpgradeQueue {
 		return this.downed;
 	}
 
-	hasPendingLevels(): boolean {
-		return this.pending > 0;
-	}
-
 	markRequested(): void {
 		this.awaitingOptions = true;
 	}

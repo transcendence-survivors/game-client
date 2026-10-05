@@ -2,14 +2,10 @@ import * as BABYLON from '@babylonjs/core';
 import {
 	BOSS_MODEL_SCALE,
 	ELITE_MODEL_SCALE,
-	getMonsterCompoundHitboxes,
 	getMonsterDefinition,
 	MONSTER_MODEL_SCALE,
 	type MonsterAnimState,
-	type MonsterHitboxPrimitive,
 } from '@transcendence/game-shared';
-import { MONSTER_HITBOX_RENDERING_GROUP } from '../combat/DebugRenderingGroups';
-import { configureDebugMesh } from '../combat/DebugMaterial';
 import {
 	animationFramesPerSecond,
 	applyStaticAnimationPose,
@@ -97,11 +93,8 @@ export class MonsterView {
 	private animationSampleAccumulatorS = 0;
 	private groundHeightAccumulatorS = 0;
 	private cameraOcclusionAccumulatorS = MONSTER_CAMERA_OCCLUSION_INTERVAL_S;
-	private hitboxUpdateAccumulatorS = 0;
 	private groundHeight = 0;
-	private isBoss = false;
 	private modelSizeMultiplier = 1;
-	private readonly kind: string;
 	private headAnchor: BABYLON.TransformNode | null = null;
 	private childMeshes: BABYLON.AbstractMesh[] | null = null;
 	private bodyMeasured = false;
@@ -118,11 +111,6 @@ export class MonsterView {
 	private deathStarted = false;
 	private deathElapsedS = 0;
 	private deathDurationS = 0;
-	private readonly hitboxParts: readonly MonsterHitboxPrimitive[];
-	private readonly posedHitboxParts: MonsterHitboxPrimitive[] = [];
-	private readonly hitboxMaterial: BABYLON.Material;
-	private readonly hitboxMeshes: BABYLON.Mesh[] = [];
-	private hitboxesVisible = false;
 
 	constructor(
 		root: BABYLON.TransformNode,
@@ -133,7 +121,6 @@ export class MonsterView {
 		initialAnimationState: MonsterAnimState,
 		initialAnimationStartedAtS: number,
 		combatTimeS: number,
-		hitboxMaterial: BABYLON.Material,
 		damageFlashMaterial: BABYLON.Material,
 		isElite = false,
 	) {
@@ -141,22 +128,11 @@ export class MonsterView {
 		this.animationSampleAccumulatorS =
 			(Math.abs(root.uniqueId) % ANIMATION_PHASE_BUCKETS) *
 			(MONSTER_ANIMATION_INTERVAL_S / ANIMATION_PHASE_BUCKETS);
-		this.kind = kind;
-		this.isBoss = isBoss;
 		this.modelSizeMultiplier =
 			(getMonsterDefinition(kind)?.visualScale ?? 1) *
 			(isElite ? ELITE_MODEL_SCALE : 1);
 		this.animationState = initialAnimationState;
 		this.animationStartedAtS = initialAnimationStartedAtS;
-		this.hitboxParts = getMonsterCompoundHitboxes(
-			kind,
-			isBoss,
-			'idle',
-			0,
-			[],
-			this.modelSizeMultiplier,
-		);
-		this.hitboxMaterial = hitboxMaterial;
 		this.damageFlashMaterial = damageFlashMaterial;
 		this.root.rotationQuaternion = null;
 		this.root.scaling = this.root.scaling.scale(
@@ -285,80 +261,6 @@ export class MonsterView {
 		if (stateChanged) this.animationStateAgeS = 0;
 	}
 
-	setHitboxVisible(visible: boolean) {
-		this.hitboxesVisible = visible;
-		if (this.hitboxMeshes.length === 0 && visible) {
-			this.hitboxParts.forEach((part, index) => {
-				const name = `${this.root.name}_hitbox_${index}`;
-				const mesh =
-					part.shape === 'sphere'
-						? BABYLON.MeshBuilder.CreateSphere(
-								name,
-								{ diameter: part.radius * 2, segments: 16 },
-								this.root.getScene(),
-							)
-						: BABYLON.MeshBuilder.CreateCylinder(
-								name,
-								{
-									diameter: part.radius * 2,
-									height: part.height,
-									tessellation: 24,
-								},
-								this.root.getScene(),
-							);
-				configureDebugMesh(
-					mesh,
-					this.hitboxMaterial,
-					MONSTER_HITBOX_RENDERING_GROUP,
-				);
-				this.hitboxMeshes.push(mesh);
-			});
-			this.updateHitboxPosition(0, 0, true);
-		}
-		this.hitboxMeshes.forEach((mesh) => {
-			mesh.isVisible = visible;
-		});
-	}
-
-	private updateHitboxPosition(
-		deltaTime: number,
-		combatTimeS: number,
-		force = false,
-	) {
-		if (!this.hitboxesVisible || this.hitboxMeshes.length === 0) return;
-		if (!force) {
-			this.hitboxUpdateAccumulatorS += Math.min(
-				Math.max(0, deltaTime),
-				0.25,
-			);
-			if (
-				this.hitboxUpdateAccumulatorS + Number.EPSILON <
-				MONSTER_ANIMATION_INTERVAL_S
-			)
-				return;
-			this.hitboxUpdateAccumulatorS %= MONSTER_ANIMATION_INTERVAL_S;
-		}
-		const posedParts = getMonsterCompoundHitboxes(
-			this.kind,
-			this.isBoss,
-			this.animationState,
-			this.animationTimeS(combatTimeS),
-			this.posedHitboxParts,
-			this.modelSizeMultiplier,
-		);
-		const angle = this.root.rotation.y + Math.PI;
-		const sin = Math.sin(angle);
-		const cos = Math.cos(angle);
-		this.hitboxMeshes.forEach((mesh, index) => {
-			const part = posedParts[index];
-			mesh.position.set(
-				this.root.position.x + part.offsetX * cos + part.offsetZ * sin,
-				this.root.position.y + part.offsetY,
-				this.root.position.z + part.offsetZ * cos - part.offsetX * sin,
-			);
-		});
-	}
-
 	flashDamage() {
 		if (this.deathStarted) return;
 		this.damageFlashRemainingS = MONSTER_DAMAGE_FLASH_DURATION_S;
@@ -422,10 +324,6 @@ export class MonsterView {
 
 	getHeadWorldPositionToRef(result: BABYLON.Vector3): void {
 		result.copyFrom(this.ensureHeadAnchor().getAbsolutePosition());
-	}
-
-	getPosition(): BABYLON.Vector3 {
-		return this.root.position;
 	}
 
 	play(
@@ -562,7 +460,6 @@ export class MonsterView {
 		);
 		this.updateDamageFlash(deltaTime);
 		this.updateAnimation(deltaTime, animationTimeS);
-		this.updateHitboxPosition(deltaTime, animationTimeS);
 		if (camera) {
 			this.cameraOcclusionAccumulatorS += Math.min(
 				Math.max(0, deltaTime),
@@ -594,8 +491,6 @@ export class MonsterView {
 	dispose() {
 		this.clearDamageFlash();
 		this.headAnchor?.dispose();
-		this.hitboxMeshes.forEach((mesh) => mesh.dispose());
-		this.hitboxMeshes.length = 0;
 		this.animations.forEach((group) => group.dispose());
 		this.animations.clear();
 		this.staticAnimationPoses.clear();

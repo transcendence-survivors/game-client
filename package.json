@@ -7,8 +7,6 @@
 	"types": "./src/index.ts",
 	"scripts": {
 		"typecheck": "tsc --noEmit",
-		"test": "vitest run",
-		"test:watch": "vitest",
 		"check:animations": "node scripts/optimize-glb-animations.mjs --check",
 		"optimize:animations": "node scripts/optimize-glb-animations.mjs --write",
 		"format": "prettier --write .",
@@ -23,7 +21,6 @@
 	},
 	"devDependencies": {
 		"@types/node": "^20.19.43",
-		"typescript": "~5.9.3",
-		"vitest": "^4.1.5"
+		"typescript": "~5.9.3"
 	}
 }

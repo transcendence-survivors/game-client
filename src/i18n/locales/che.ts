@@ -136,8 +136,6 @@ const che = {
 	'debug.skinning': 'Skinning:',
 	'debug.animationCpu': 'Anim.-CPU:',
 	'debug.monsters': 'Monschter:',
-	'debug.testTools': 'Testwärkzüg',
-	'debug.hitboxes': '3D-Träfferboxe',
 	'debug.notAvailable': 'N/V',
 	'debug.monsterSummary':
 		'{total} ({elites} Elite / {bosses} Boss / {rendered} sichtbar)',
