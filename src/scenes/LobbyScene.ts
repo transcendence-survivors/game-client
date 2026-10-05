@@ -62,7 +62,6 @@ export class LobbyScene {
 
 	async show() {
 		if (await isDuplicateTab()) {
-			console.log('SUUUUUUUUUU');
 			sessionStorage.removeItem(STORAGE_COLYSEUS_TOKEN_ID_STR);
 			sessionStorage.removeItem(STORAGE_COLYSEUS_ROOM_ID_STR);
 			SceneManager.toLobby();
