@@ -136,8 +136,6 @@ const fr = {
 	'debug.skinning': 'Déformation :',
 	'debug.animationCpu': 'Anim. CPU :',
 	'debug.monsters': 'Monstres :',
-	'debug.testTools': 'Outils de test',
-	'debug.hitboxes': 'Boîtes de collision 3D',
 	'debug.notAvailable': 'N/D',
 	'debug.monsterSummary':
 		'{total} ({elites} élites / {bosses} boss / {rendered} visibles)',

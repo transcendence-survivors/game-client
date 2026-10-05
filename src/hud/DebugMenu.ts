@@ -42,7 +42,6 @@ export class DebugMenu {
 	private readonly enabled: boolean;
 	private panel: GUI.Rectangle | null = null;
 	private panelVisible = false;
-	private hitboxesVisible = false;
 	private ui: GUI.AdvancedDynamicTexture | null = null;
 	private readonly instrumentation: BABYLON.SceneInstrumentation | null;
 	private readonly engineInstrumentation: BABYLON.EngineInstrumentation | null;
@@ -60,7 +59,6 @@ export class DebugMenu {
 	private currentGpuFrameMs: number | null = null;
 	private lastDrawCalls = 0;
 	private lastGpuCounterCount = 0;
-	private readonly onHitboxesChanged: (visible: boolean) => void;
 	private readonly getMonsterStats: () => Readonly<MonsterRendererStats>;
 	private readonly keyDownHandler = (event: KeyboardEvent) => {
 		if (event.code !== 'F3' || event.repeat || !this.enabled) return;
@@ -72,7 +70,6 @@ export class DebugMenu {
 	constructor(
 		engine: BABYLON.Engine,
 		scene: BABYLON.Scene,
-		onHitboxesChanged: (visible: boolean) => void = () => {},
 		enabled = true,
 		getMonsterStats: () => Readonly<MonsterRendererStats> = () =>
 			EMPTY_MONSTER_STATS,
@@ -102,7 +99,6 @@ export class DebugMenu {
 		this.frameEndObserver = enabled
 			? engine.onEndFrameObservable.add(() => this.recordFrameTimes())
 			: null;
-		this.onHitboxesChanged = onHitboxesChanged;
 		this.getMonsterStats = getMonsterStats;
 		if (enabled) {
 			this.initGUI(scene);
@@ -117,7 +113,7 @@ export class DebugMenu {
 		this.panel = debugMenu;
 
 		debugMenu.width = '430px';
-		debugMenu.height = '560px';
+		debugMenu.height = '492px';
 		debugMenu.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
 		debugMenu.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
 		debugMenu.left = '36px';
@@ -230,49 +226,6 @@ export class DebugMenu {
 			animationTime: addStatLine(gameI18n.t('debug.animationCpu')),
 			monsters: addStatLine(gameI18n.t('debug.monsters')),
 		};
-		addSection(gameI18n.t('debug.testTools').toUpperCase());
-
-		const addToggle = (
-			name: string,
-			labelText: string,
-			labelColor: string,
-			toggleColor: string,
-			checked: boolean,
-			onChanged: (checked: boolean) => void,
-		) => {
-			const row = new GUI.StackPanel(`${name}Row`);
-			row.isVertical = false;
-			row.height = '40px';
-			const label = hudText(`${name}Label`, labelText, 14, labelColor);
-			label.width = '330px';
-			label.textHorizontalAlignment =
-				GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-			row.addControl(label);
-			const toggle = new GUI.Checkbox(name);
-			toggle.width = '24px';
-			toggle.height = '24px';
-			toggle.color = toggleColor;
-			toggle.background = HUD_THEME.panelHover;
-			toggle.isChecked = checked;
-			toggle.onIsCheckedChangedObservable.add(onChanged);
-			row.addControl(toggle);
-			panel.addControl(row);
-		};
-		addToggle(
-			'hitboxToggle',
-			gameI18n.t('debug.hitboxes'),
-			'#ff8b72',
-			'#ff5c5c',
-			this.hitboxesVisible,
-			(visible) => {
-				this.hitboxesVisible = visible;
-				this.onHitboxesChanged(visible);
-			},
-		);
-	}
-
-	areHitboxesVisible(): boolean {
-		return this.hitboxesVisible;
 	}
 
 	private setPanelVisible(visible: boolean): void {

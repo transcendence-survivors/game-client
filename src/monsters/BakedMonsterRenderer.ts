@@ -205,10 +205,6 @@ export class BakedMonsterRenderer {
 		}
 	}
 
-	has(id: string): boolean {
-		return this.monsters.has(id);
-	}
-
 	setTarget(id: string, monster: Monster): void {
 		const record = this.monsters.get(id);
 		if (!record) return;

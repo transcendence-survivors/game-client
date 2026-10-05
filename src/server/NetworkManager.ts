@@ -19,10 +19,6 @@ export class NetworkManager {
 		this.client = new Client(gameSocketUrl);
 	}
 
-	getClient() {
-		return this.client;
-	}
-
 	async createRoom(rawName: string) {
 		try {
 			return persistRoom(

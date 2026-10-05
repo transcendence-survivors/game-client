@@ -1,1 +1,0 @@
-export { MonsterRenderer } from './MonsterRenderer';

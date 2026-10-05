@@ -15,9 +15,7 @@ import {
 import { MonsterView } from './MonsterView';
 import { DamageNumbers } from './DamageNumbers';
 import { getMonsterModelUrl } from '../assets/models';
-import { preserveWorldDepthForDebug } from '../combat/DebugRenderingGroups';
 import { AsyncViewRegistry } from '../combat/AsyncViewRegistry';
-import { createDebugMaterial } from '../combat/DebugMaterial';
 import { CleanupBag } from '../CleanupBag';
 import {
 	extractStaticAnimationPoses,
@@ -58,9 +56,7 @@ export class MonsterRenderer {
 	private readonly bakedMonsters: BakedMonsterRenderer;
 	private readonly overlayUi: GUI.AdvancedDynamicTexture;
 	private readonly damageNumbers: DamageNumbers;
-	private readonly hitboxMaterial: BABYLON.StandardMaterial;
 	private readonly damageFlashMaterial: BABYLON.StandardMaterial;
-	private hitboxesVisible = false;
 	private readonly views = new AsyncViewRegistry<MonsterView>();
 	private readonly subscriptions = new CleanupBag();
 	private readonly monsterChangeSubscriptions = new Map<string, () => void>();
@@ -109,13 +105,6 @@ export class MonsterRenderer {
 			this.assets,
 			(url) => this.prepareModel(url),
 		);
-		preserveWorldDepthForDebug(scene);
-		this.hitboxMaterial = createDebugMaterial(
-			scene,
-			'monsterHitboxMaterial',
-			new BABYLON.Color3(1, 0.04, 0.02),
-			0.9,
-		);
 		this.damageFlashMaterial = new BABYLON.StandardMaterial(
 			'monsterDamageFlashMaterial',
 			scene,
@@ -128,11 +117,6 @@ export class MonsterRenderer {
 		this.overlayUi = createFullscreenUi('monsterOverlay', scene);
 		this.overlayUi.useInvalidateRectOptimization = true;
 		this.damageNumbers = new DamageNumbers(scene, this.overlayUi);
-	}
-
-	setHitboxesVisible(visible: boolean): void {
-		this.hitboxesVisible = visible;
-		this.views.forEach((view) => view.setHitboxVisible(visible));
 	}
 
 	listen(): void {
@@ -462,7 +446,6 @@ export class MonsterRenderer {
 					monster.animState,
 					monster.animStartedAtS,
 					this.room.state.combatTimeS,
-					this.hitboxMaterial,
 					this.damageFlashMaterial,
 					monster.isElite,
 				);
@@ -472,7 +455,6 @@ export class MonsterRenderer {
 					this.mapGen.getGroundHeight(monster.x, monster.z),
 					monster.rotationY,
 				);
-				view.setHitboxVisible(this.hitboxesVisible);
 				return view;
 			});
 			const view = this.views.get(monsterId);
@@ -522,7 +504,6 @@ export class MonsterRenderer {
 		this.views.dispose();
 		this.damageNumbers.dispose();
 		this.assets.dispose();
-		this.hitboxMaterial.dispose();
 		this.damageFlashMaterial.dispose();
 		this.overlayUi.dispose();
 	}
