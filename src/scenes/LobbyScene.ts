@@ -203,7 +203,7 @@ export class LobbyScene {
 			}
 		};
 
-		const goBack = () => history.back();
+		const goBack = () => (window.location.href = '/game');
 
 		titleIcon.onPointerUpObservable.add(goBack);
 		titleText.onPointerUpObservable.add(goBack);

@@ -145,16 +145,16 @@ export class WaitingScreen {
 			'Title',
 		) as GUI.TextBlock;
 
-		const goback = async () => {
+		const goback = () => {
 			if (leaving) return;
 			leaving = true;
 			try {
 				clearStoredRoom();
-				await this.room.leave();
+				this.room.leave();
 			} catch (error) {
 				console.warn('leave failed', error);
 			}
-			history.back();
+			window.location.href = '/game';
 		};
 
 		titleIcon.onPointerUpObservable.add(goback);
@@ -176,7 +176,7 @@ export class WaitingScreen {
 			const newReady = !player.ready;
 			this.room.send('ready', newReady);
 			text.text = gameI18n.t(
-				newReady ? 'waiting.ready' : 'waiting.notReady',
+				newReady ? 'waiting.notReady' : 'waiting.ready',
 			);
 		});
 	}
