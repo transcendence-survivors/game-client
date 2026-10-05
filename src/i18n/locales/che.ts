@@ -1,16 +1,6 @@
 import type { TranslationCatalog } from '../types';
 
 const che = {
-	'menu.title': 'Light Keepers',
-	'menu.play': 'Spile',
-	'menu.language': 'Sproch: {language}',
-	'language.en': 'Änglisch',
-	'language.fr': 'Französisch',
-	'language.de': 'Dütsch',
-	'language.es': 'Spanisch',
-	'language.che': 'Schwiizerdütsch',
-	'language.it': 'Italiänisch',
-	'lobby.title': 'Light Keepers',
 	'lobby.roomNamePlaceholder': 'Ruumname',
 	'lobby.createRoom': 'Ruum erstelle',
 	'lobby.joinRoom': 'Ruum biträtte',
@@ -55,7 +45,6 @@ const che = {
 	'settings.back': 'Zrugg',
 	'settings.space': 'LEERTASTE',
 	'settings.reserved': 'RESERVIERT',
-	'hud.dead': 'TOT',
 	'hud.kills': 'Eliminierige',
 	'hud.onlineTeam': 'Online-Team',
 	'hud.boss': 'Boss',
@@ -80,7 +69,6 @@ const che = {
 	'upgrade.newWeapon': 'Neui Waffe',
 	'upgrade.addedToArsenal': 'Dinem Arsenal dezuegfüegt',
 	'upgrade.unlock': '{weapon} freischalte',
-	'upgrade.improvement': 'Verbesserig',
 	'upgrade.categoryRarity': '{category} · {rarity}',
 	'upgrade.value': '{value} {attribute}',
 	'rarity.common': 'Gwöhnlich',

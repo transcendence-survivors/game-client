@@ -7,43 +7,6 @@ import {
 import { CombatAssetLibrary } from './CombatAssetLibrary';
 import { CombatEntityView, ProjectileView } from './CombatEntityView';
 
-class AxeView extends ProjectileView {
-	private readonly spinner: BABYLON.TransformNode;
-
-	constructor(
-		entity: CombatEntity,
-		root: BABYLON.TransformNode,
-		spinner: BABYLON.TransformNode,
-	) {
-		super(entity, root);
-		this.spinner = spinner;
-	}
-
-	protected animate(deltaTimeS: number, combatTimeS: number): void {
-		super.animate(deltaTimeS, combatTimeS);
-		this.spinner.rotation.y += deltaTimeS * 12;
-	}
-}
-
-class FireballView extends ProjectileView {
-	private readonly seed: number;
-
-	constructor(
-		entity: CombatEntity,
-		root: BABYLON.TransformNode,
-		seed: number,
-	) {
-		super(entity, root);
-		this.seed = seed;
-	}
-
-	protected animate(deltaTimeS: number, combatTimeS: number): void {
-		super.animate(deltaTimeS, combatTimeS);
-		const pulse = 1 + Math.sin(combatTimeS * 8 + this.seed * TAU) * 0.08;
-		this.root.scaling.setAll(pulse);
-	}
-}
-
 export class CombatViewFactory {
 	private readonly fireballSource: BABYLON.Mesh;
 	private readonly fireballMaterial: BABYLON.StandardMaterial;
@@ -126,7 +89,12 @@ export class CombatViewFactory {
 				glow.parent = root;
 				core.isVisible = true;
 				glow.isVisible = true;
-				return new FireballView(entity, root, this.hash(id));
+				const seed = this.hash(id);
+				return new ProjectileView(entity, root, (_, combatTimeS) =>
+					root.scaling.setAll(
+						1 + Math.sin(combatTimeS * 8 + seed * TAU) * 0.08,
+					),
+				);
 			}
 		}
 	}
@@ -147,7 +115,9 @@ export class CombatViewFactory {
 		this.applyTransform(model, weaponModels[kind].combat);
 		if (kind === 'axe') {
 			model.scaling.scaleInPlace(entity.scale);
-			return new AxeView(entity, root, parent);
+			return new ProjectileView(entity, root, (deltaTimeS) => {
+				parent.rotation.y += deltaTimeS * 12;
+			});
 		}
 		return new ProjectileView(entity, root);
 	}

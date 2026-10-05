@@ -1,6 +1,6 @@
 import type { Scene } from '@babylonjs/core';
 import * as GUI from '@babylonjs/gui';
-import { createFullscreenUi } from '../assets/ui';
+import { createFullscreenUi, getGuiControls } from '../assets/ui';
 import * as COLYSEUS from '@colyseus/sdk';
 import {
 	ClientMessage,
@@ -22,7 +22,7 @@ import {
 	localizeUpgradeTitle,
 } from '../i18n';
 
-interface UpgradeCardControls {
+interface UpgradeCardGui {
 	panel: GUI.Rectangle;
 	accent: GUI.Rectangle;
 	iconFrame: GUI.Ellipse;
@@ -34,8 +34,25 @@ interface UpgradeCardControls {
 	rarityBadge: GUI.Rectangle;
 	rarityText: GUI.TextBlock;
 	keyText: GUI.TextBlock;
+}
+
+interface UpgradeCardControls extends UpgradeCardGui {
 	accentColor: string;
 }
+
+const CARD_CONTROL_SUFFIXES: Readonly<Record<keyof UpgradeCardGui, string>> = {
+	panel: '',
+	accent: 'Accent',
+	iconFrame: 'IconFrame',
+	icon: 'Icon',
+	title: 'Title',
+	level: 'Level',
+	description: 'Description',
+	separator: 'Separator',
+	rarityBadge: 'RarityBadge',
+	rarityText: 'Rarity',
+	keyText: 'Key',
+};
 
 const UPGRADE_KEY_ACTIONS = ['upgrade1', 'upgrade2', 'upgrade3'] as const;
 
@@ -88,52 +105,14 @@ export class LevelUpMenu {
 	}
 
 	private getCardControls(index: number): UpgradeCardControls {
-		const panel = this.advTex.getControlByName(
-			`UpgradeCard${index}`,
-		) as GUI.Rectangle;
-		const accent = this.advTex.getControlByName(
-			`UpgradeCard${index}Accent`,
-		) as GUI.Rectangle;
-		const iconFrame = this.advTex.getControlByName(
-			`UpgradeCard${index}IconFrame`,
-		) as GUI.Ellipse;
-		const icon = this.advTex.getControlByName(
-			`UpgradeCard${index}Icon`,
-		) as GUI.Image;
-		const title = this.advTex.getControlByName(
-			`UpgradeCard${index}Title`,
-		) as GUI.TextBlock;
-		const level = this.advTex.getControlByName(
-			`UpgradeCard${index}Level`,
-		) as GUI.TextBlock;
-		const description = this.advTex.getControlByName(
-			`UpgradeCard${index}Description`,
-		) as GUI.TextBlock;
-		const separator = this.advTex.getControlByName(
-			`UpgradeCard${index}Separator`,
-		) as GUI.Rectangle;
-		const rarityBadge = this.advTex.getControlByName(
-			`UpgradeCard${index}RarityBadge`,
-		) as GUI.Rectangle;
-		const rarityText = this.advTex.getControlByName(
-			`UpgradeCard${index}Rarity`,
-		) as GUI.TextBlock;
-		const keyText = this.advTex.getControlByName(
-			`UpgradeCard${index}Key`,
-		) as GUI.TextBlock;
-
+		const names = Object.fromEntries(
+			Object.entries(CARD_CONTROL_SUFFIXES).map(([key, suffix]) => [
+				key,
+				`UpgradeCard${index}${suffix}`,
+			]),
+		) as Record<keyof UpgradeCardGui, string>;
 		return {
-			panel,
-			accent,
-			iconFrame,
-			icon,
-			title,
-			level,
-			description,
-			separator,
-			rarityBadge,
-			rarityText,
-			keyText,
+			...getGuiControls<UpgradeCardGui>(this.advTex, names),
 			accentColor: HUD_THEME.gold,
 		};
 	}

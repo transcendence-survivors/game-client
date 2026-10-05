@@ -1,5 +1,4 @@
 import type {
-	TomeId,
 	TomeStat,
 	UpgradeDisplayEffect,
 	UpgradeOption,
@@ -8,28 +7,6 @@ import type {
 } from '@transcendence/game-shared';
 import { gameI18n } from './GameI18n';
 import type { GameLocale, TranslationKey } from './types';
-
-const TOME_NAME_KEYS: Readonly<Record<TomeId, TranslationKey>> = {
-	damage: 'tome.damage',
-	cooldown: 'tome.cooldown',
-	agility: 'tome.agility',
-	vitality: 'tome.vitality',
-	armor: 'tome.armor',
-	blood: 'tome.blood',
-	range: 'tome.range',
-	size: 'tome.size',
-	duration: 'tome.duration',
-	quantity: 'tome.quantity',
-	fortune: 'tome.fortune',
-};
-
-const WEAPON_NAME_KEYS: Readonly<Record<WeaponKind, TranslationKey>> = {
-	aura: 'weapon.aura',
-	sword: 'weapon.sword',
-	axe: 'weapon.axe',
-	staff: 'weapon.staff',
-	bow: 'weapon.bow',
-};
 
 const TOME_TRAIT_KEYS: Readonly<Record<TomeStat, TranslationKey>> = {
 	attackDamage: 'trait.damage',
@@ -69,7 +46,7 @@ const NUMBER_LOCALES: Readonly<Record<GameLocale, string>> = {
 const numberFormatters = new Map<string, Intl.NumberFormat>();
 
 function localizedWeaponName(weaponKind: WeaponKind): string {
-	return gameI18n.t(WEAPON_NAME_KEYS[weaponKind]);
+	return gameI18n.t(`weapon.${weaponKind}`);
 }
 
 function traitKey(effect: UpgradeDisplayEffect): TranslationKey {
@@ -112,7 +89,7 @@ export function localizeUpgradeTitle(option: UpgradeOption): {
 
 	const title =
 		option.category === 'tome'
-			? gameI18n.t(TOME_NAME_KEYS[option.tomeId])
+			? gameI18n.t(`tome.${option.tomeId}`)
 			: localizedWeaponName(option.weaponKind);
 	return {
 		title,

@@ -1,16 +1,6 @@
 import type { TranslationCatalog } from '../types';
 
 const it = {
-	'menu.title': 'Light Keepers',
-	'menu.play': 'Gioca',
-	'menu.language': 'Lingua: {language}',
-	'language.en': 'Inglese',
-	'language.fr': 'Francese',
-	'language.de': 'Tedesco',
-	'language.es': 'Spagnolo',
-	'language.che': 'Svizzero tedesco',
-	'language.it': 'Italiano',
-	'lobby.title': 'Light Keepers',
 	'lobby.roomNamePlaceholder': 'Nome della stanza',
 	'lobby.createRoom': 'Crea stanza',
 	'lobby.joinRoom': 'Entra nella stanza',
@@ -55,7 +45,6 @@ const it = {
 	'settings.back': 'Indietro',
 	'settings.space': 'SPAZIO',
 	'settings.reserved': 'RISERVATO',
-	'hud.dead': 'MORTO',
 	'hud.kills': 'Eliminazioni',
 	'hud.onlineTeam': 'Squadra online',
 	'hud.boss': 'Boss',
@@ -80,7 +69,6 @@ const it = {
 	'upgrade.newWeapon': 'Nuova arma',
 	'upgrade.addedToArsenal': 'Aggiunta al tuo arsenale',
 	'upgrade.unlock': 'Sblocca {weapon}',
-	'upgrade.improvement': 'Potenziamento',
 	'upgrade.categoryRarity': '{category} · {rarity}',
 	'upgrade.value': '{value} {attribute}',
 	'rarity.common': 'Comune',

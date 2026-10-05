@@ -111,13 +111,6 @@ export class WaitingScreen {
 
 		if (!pp || !usernamePh || !readyIndicator) return;
 
-		if (!player) {
-			pp.source = iconsImport.ppPh;
-			usernamePh.text = '';
-			readyIndicator.source = iconsImport.notReadyIndicator;
-			return;
-		}
-
 		pp.source = iconsImport.ppPh;
 		pp.source = player.avatarUrl;
 

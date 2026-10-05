@@ -61,6 +61,8 @@ export function loopedAnimationFrame(
 	return duration > 0 ? from + ((timeS * framesPerSecond) % duration) : from;
 }
 
+const clampedStepS = (dt: number) => Math.min(Math.max(0, dt), 0.25);
+
 function animationDurationS(group: BABYLON.AnimationGroup): number {
 	const framesPerSecond = animationFramesPerSecond(group);
 	const durationFrames = group.to - group.from;
@@ -190,12 +192,6 @@ export class MonsterView {
 	}
 
 	setTarget(x: number, z: number, rotationY: number) {
-		if (
-			this.target.x === x &&
-			this.target.z === z &&
-			this.target.rotationY === rotationY
-		)
-			return;
 		this.target.x = x;
 		this.target.z = z;
 		this.target.rotationY = rotationY;
@@ -349,10 +345,7 @@ export class MonsterView {
 			return;
 		}
 		this.animationStateAgeS += Math.max(0, deltaTime);
-		this.animationSampleAccumulatorS += Math.min(
-			Math.max(0, deltaTime),
-			0.25,
-		);
+		this.animationSampleAccumulatorS += clampedStepS(deltaTime);
 		const transitionDelay = animationTransitionDelay(
 			this.currentAnimation,
 			this.animationState,
@@ -446,10 +439,7 @@ export class MonsterView {
 		this.updateDamageFlash(deltaTime);
 		this.updateAnimation(deltaTime, animationTimeS);
 		if (camera) {
-			this.cameraOcclusionAccumulatorS += Math.min(
-				Math.max(0, deltaTime),
-				0.25,
-			);
+			this.cameraOcclusionAccumulatorS += clampedStepS(deltaTime);
 			if (
 				this.cameraOcclusionAccumulatorS + Number.EPSILON >=
 				MONSTER_CAMERA_OCCLUSION_INTERVAL_S
@@ -463,13 +453,7 @@ export class MonsterView {
 
 	updateOffscreen(deltaTime: number): void {
 		this.animationStateAgeS += Math.max(0, deltaTime);
-		if (this.damageFlashRemainingS > 0) {
-			this.damageFlashRemainingS = Math.max(
-				0,
-				this.damageFlashRemainingS - Math.max(0, deltaTime),
-			);
-			if (this.damageFlashRemainingS <= 0) this.clearDamageFlash();
-		}
+		this.updateDamageFlash(deltaTime);
 		this.advanceDeath(deltaTime, false);
 	}
 

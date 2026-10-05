@@ -5,7 +5,10 @@ import '@babylonjs/loaders/glTF/2.0';
 import { InputManager } from '../server/InputManager';
 import { MapGenerator } from '../map/MapGenerator';
 import { DebugMenu } from '../hud/DebugMenu';
-import { ServerOrchestrator } from '../server/ServerOrchestrator';
+import {
+	ServerOrchestrator,
+	copyMoveInput,
+} from '../server/ServerOrchestrator';
 import { ForestRenderer } from '../map/nature/ForestRenderer';
 import { MonsterRenderer } from '../monsters/MonsterRenderer';
 
@@ -80,6 +83,7 @@ export class GameScene {
 	private readonly networkInputCadence = new NetworkInputCadence();
 	private readonly simulationInput = createMoveInput();
 	private readonly networkInput = createMoveInput();
+	private readonly previousInput = createMoveInput();
 	private readonly movementBoundary: MovementBoundary = {
 		centerX: 0,
 		centerZ: 0,
@@ -339,11 +343,7 @@ export class GameScene {
 			const jumpTriggered = jumpKeyPressed && !this.jumpKeyWasPressed;
 			this.jumpKeyWasPressed = jumpKeyPressed;
 			const input = this.simulationInput;
-			const previousForward = input.forward;
-			const previousBackward = input.backward;
-			const previousRight = input.right;
-			const previousLeft = input.left;
-			const previousCameraYaw = input.cameraYaw;
+			copyMoveInput(this.previousInput, input);
 			input.seq = this.seq;
 
 			let joyForward = false;
@@ -425,25 +425,17 @@ export class GameScene {
 			if (previousStateDeltaTime > 0) {
 				const networkInput = this.networkInput;
 				networkInput.seq = ++this.seq;
-				networkInput.forward = previousForward;
-				networkInput.backward = previousBackward;
-				networkInput.right = previousRight;
-				networkInput.left = previousLeft;
+				copyMoveInput(networkInput, this.previousInput);
 				networkInput.jump = false;
 				networkInput.deltaTime = previousStateDeltaTime;
-				networkInput.cameraYaw = previousCameraYaw;
 				this.server.sendMovementInput(networkInput);
 			}
 			if (networkDeltaTime !== null) {
 				const networkInput = this.networkInput;
 				networkInput.seq = ++this.seq;
-				networkInput.forward = input.forward;
-				networkInput.backward = input.backward;
-				networkInput.right = input.right;
-				networkInput.left = input.left;
+				copyMoveInput(networkInput, input);
 				networkInput.jump = input.jump;
 				networkInput.deltaTime = Math.min(networkDeltaTime, MAX_DT);
-				networkInput.cameraYaw = input.cameraYaw;
 				this.server.sendMovementInput(networkInput);
 			}
 			this.server.setUnsentPrediction(
@@ -498,6 +490,15 @@ export class GameScene {
 				}
 			}
 		});
+	}
+
+	private rotateCamera(dx: number, dy: number, sensitivity: number) {
+		this.camera.alpha -= dx * sensitivity;
+		this.camera.beta -= dy * sensitivity;
+		this.camera.beta = Math.max(
+			this.camera.lowerBetaLimit as number,
+			Math.min(this.camera.upperBetaLimit as number, this.camera.beta),
+		);
 	}
 
 	private updateReviveIntent(downed: boolean): void {
@@ -561,17 +562,8 @@ export class GameScene {
 
 		const sensitivity = 0.0025;
 
-		if (document.pointerLockElement === canvas) {
-			this.camera.alpha -= e.movementX * sensitivity;
-			this.camera.beta -= e.movementY * sensitivity;
-			this.camera.beta = Math.max(
-				this.camera.lowerBetaLimit as number,
-				Math.min(
-					this.camera.upperBetaLimit as number,
-					this.camera.beta,
-				),
-			);
-		}
+		if (document.pointerLockElement === canvas)
+			this.rotateCamera(e.movementX, e.movementY, sensitivity);
 	};
 
 	private isActionPressed(action: MobileAction & keyof KeyBindings) {
@@ -606,15 +598,7 @@ export class GameScene {
 				const deltaY = event.clientY - this.touchCameraLastY;
 				this.touchCameraLastX = event.clientX;
 				this.touchCameraLastY = event.clientY;
-				this.camera.alpha -= deltaX * TOUCH_CAMERA_SENSITIVITY;
-				this.camera.beta -= deltaY * TOUCH_CAMERA_SENSITIVITY;
-				this.camera.beta = Math.max(
-					this.camera.lowerBetaLimit as number,
-					Math.min(
-						this.camera.upperBetaLimit as number,
-						this.camera.beta,
-					),
-				);
+				this.rotateCamera(deltaX, deltaY, TOUCH_CAMERA_SENSITIVITY);
 			} else if (
 				pointerInfo.type === BABYLON.PointerEventTypes.POINTERUP
 			) {

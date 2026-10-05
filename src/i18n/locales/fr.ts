@@ -1,16 +1,6 @@
 import type { TranslationCatalog } from '../types';
 
 const fr = {
-	'menu.title': 'Light Keepers',
-	'menu.play': 'Jouer',
-	'menu.language': 'Langue : {language}',
-	'language.en': 'Anglais',
-	'language.fr': 'Français',
-	'language.de': 'Allemand',
-	'language.es': 'Espagnol',
-	'language.che': 'Suisse allemand',
-	'language.it': 'Italien',
-	'lobby.title': 'Light Keepers',
 	'lobby.roomNamePlaceholder': 'Nom de la partie',
 	'lobby.createRoom': 'Créer une partie',
 	'lobby.joinRoom': 'Rejoindre une partie',
@@ -55,7 +45,6 @@ const fr = {
 	'settings.back': 'Retour',
 	'settings.space': 'ESPACE',
 	'settings.reserved': 'RÉSERVÉE',
-	'hud.dead': 'MORT',
 	'hud.kills': 'Éliminations',
 	'hud.onlineTeam': 'Équipe en ligne',
 	'hud.boss': 'Boss',
@@ -80,7 +69,6 @@ const fr = {
 	'upgrade.newWeapon': 'Nouvelle arme',
 	'upgrade.addedToArsenal': 'Ajoutée à votre arsenal',
 	'upgrade.unlock': 'Débloquer {weapon}',
-	'upgrade.improvement': 'Amélioration',
 	'upgrade.categoryRarity': '{category} · {rarity}',
 	'upgrade.value': '{value} {attribute}',
 	'rarity.common': 'Commun',

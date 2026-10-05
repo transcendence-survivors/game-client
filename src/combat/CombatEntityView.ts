@@ -16,14 +16,22 @@ export function shouldSnapCombatEntity(distanceSquared: number): boolean {
 	);
 }
 
+type AnimateCallback = (deltaTimeS: number, combatTimeS: number) => void;
+
 export class CombatEntityView {
 	protected readonly entity: CombatEntity;
 	protected readonly root: BABYLON.TransformNode;
 	private readonly target = new BABYLON.Vector3();
+	private readonly onAnimate?: AnimateCallback;
 
-	constructor(entity: CombatEntity, root: BABYLON.TransformNode) {
+	constructor(
+		entity: CombatEntity,
+		root: BABYLON.TransformNode,
+		onAnimate?: AnimateCallback,
+	) {
 		this.entity = entity;
 		this.root = root;
+		this.onAnimate = onAnimate;
 		this.snap();
 	}
 
@@ -48,6 +56,7 @@ export class CombatEntityView {
 		}
 		this.root.rotation.y = this.entity.rotationY;
 		this.animate(deltaTimeS, combatTimeS);
+		this.onAnimate?.(deltaTimeS, combatTimeS);
 	}
 
 	dispose(): void {

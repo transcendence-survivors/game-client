@@ -1,5 +1,10 @@
-import type { AbstractMesh, AnimationGroup, Scene } from '@babylonjs/core';
-import { AssetContainerCache } from './AssetContainerCache';
+import {
+	LoadAssetContainerAsync,
+	type AbstractMesh,
+	type AnimationGroup,
+	type AssetContainer,
+	type Scene,
+} from '@babylonjs/core';
 
 export interface ModelInstance {
 	root: AbstractMesh;
@@ -11,10 +16,23 @@ interface ModelInstantiationOptions {
 }
 
 export class ModelAssetLibrary {
-	private readonly assets: AssetContainerCache;
+	private readonly containers = new Map<string, Promise<AssetContainer>>();
+	private readonly scene: Scene;
 
-	constructor(scene: Scene, assets = new AssetContainerCache(scene)) {
-		this.assets = assets;
+	constructor(scene: Scene) {
+		this.scene = scene;
+	}
+
+	private load(url: string): Promise<AssetContainer> {
+		const cached = this.containers.get(url);
+		if (cached) return cached;
+		const pending = LoadAssetContainerAsync(url, this.scene);
+		this.containers.set(url, pending);
+		void pending.catch(() => {
+			if (this.containers.get(url) === pending)
+				this.containers.delete(url);
+		});
+		return pending;
 	}
 
 	async instantiate(
@@ -22,7 +40,7 @@ export class ModelAssetLibrary {
 		name: string,
 		options?: ModelInstantiationOptions,
 	): Promise<ModelInstance> {
-		const container = await this.assets.load(url);
+		const container = await this.load(url);
 		const nameFunction = (nodeName: string) => `${name}:${nodeName}`;
 		const instance = options
 			? container.instantiateModelsToScene(nameFunction, false, options)
@@ -34,6 +52,9 @@ export class ModelAssetLibrary {
 	}
 
 	dispose(): void {
-		this.assets.dispose();
+		this.containers.forEach((pending) =>
+			pending.then((container) => container.dispose()).catch(() => {}),
+		);
+		this.containers.clear();
 	}
 }

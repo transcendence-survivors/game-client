@@ -25,7 +25,7 @@ import {
 	createHudBar,
 } from './HudPrimitives';
 import { formatGameTime, hudBarWidth, isLivingBoss } from './HudFormatting';
-import { gameI18n, type TranslationKey } from '../i18n';
+import { gameI18n } from '../i18n';
 
 interface HudControls {
 	hpBar: GUI.Rectangle;
@@ -89,13 +89,6 @@ const TEAM_HEADER_HEIGHT = 36;
 const TEAM_SLOT_HEIGHT = 44;
 const compareIds = (first: string, second: string): number =>
 	first.localeCompare(second);
-const WEAPON_NAME_KEYS: Readonly<Record<WeaponKind, TranslationKey>> = {
-	aura: 'weapon.aura',
-	sword: 'weapon.sword',
-	axe: 'weapon.axe',
-	staff: 'weapon.staff',
-	bow: 'weapon.bow',
-};
 const TOME_ICONS = new Map(
 	TOME_DEFINITIONS.map(({ id, iconUrl }) => [id, iconUrl] as const),
 );
@@ -870,7 +863,7 @@ export class Hud {
 		this.fillItemSlot(
 			slot,
 			iconsImport[WEAPON_ICONS[kind]],
-			gameI18n.t(WEAPON_NAME_KEYS[kind]).toUpperCase(),
+			gameI18n.t(`weapon.${kind}`).toUpperCase(),
 			HUD_THEME.text,
 		);
 		slot.level.text = String(level);

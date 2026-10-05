@@ -32,8 +32,6 @@ type SupportPoint = Vec3d;
 interface SupportMetadata {
 	readonly points: readonly SupportPoint[];
 	readonly center: SupportPoint;
-	readonly minY: number;
-	readonly band: number;
 }
 
 interface ThinInstanceBatch {
@@ -68,10 +66,10 @@ const SUPPORT_BAND_RATIO = 0.2;
 const MIN_SUPPORT_BAND = 0.12;
 const MAX_SUPPORT_BAND = 2;
 const MAX_SUPPORT_POINTS = 32;
-const CONTACT_ITERATIONS = 3;
 const CONTACT_EPSILON = 0.0001;
 const FOREST_PUBLICATION_BUDGET_MS = 3;
 const FOREST_PLACEMENTS_PER_PUBLICATION = 16;
+const UNSUPPORTED_MODEL = 'model cannot be thin-instanced';
 
 function capSupportPoints(
 	points: readonly SupportPoint[],
@@ -178,21 +176,7 @@ export class ForestRenderer {
 	private lastCz = Number.NaN;
 	private visibilityDirty = true;
 	private lastVisibilityCamera: BABYLON.Camera | null = null;
-	private lastVisibilityTargetX = Number.NaN;
-	private lastVisibilityTargetY = Number.NaN;
-	private lastVisibilityTargetZ = Number.NaN;
-	private lastVisibilityAlpha = Number.NaN;
-	private lastVisibilityBeta = Number.NaN;
-	private lastVisibilityRadius = Number.NaN;
-	private lastVisibilityFov = Number.NaN;
-	private lastVisibilityMinZ = Number.NaN;
-	private lastVisibilityMaxZ = Number.NaN;
-	private lastVisibilityWidth = Number.NaN;
-	private lastVisibilityHeight = Number.NaN;
-	private lastVisibilityViewportX = Number.NaN;
-	private lastVisibilityViewportY = Number.NaN;
-	private lastVisibilityViewportWidth = Number.NaN;
-	private lastVisibilityViewportHeight = Number.NaN;
+	private readonly lastViewProjection = new Float64Array(16).fill(Number.NaN);
 	private lastVisibilityZoneCenterX = Number.NaN;
 	private lastVisibilityZoneCenterZ = Number.NaN;
 	private visibilityVersion = 0;
@@ -410,13 +394,9 @@ export class ForestRenderer {
 						await this.yieldForestPublicationIfNeeded(
 							publicationStartedAt,
 						);
-					const pageKey = `${Math.floor(chunk.x / FOREST_PAGE_CHUNK_SPAN)},${Math.floor(chunk.z / FOREST_PAGE_CHUNK_SPAN)}`;
-					const existingPage = this.pages.get(pageKey);
-					const canReuseThinSource =
-						existingPage?.thinBatches.has(url) === true;
 					let model: BABYLON.AbstractMesh | null = null;
 					try {
-						if (!canReuseThinSource) {
+						if (!chunk.page.thinBatches.has(url)) {
 							const instance = await this.assets.instantiate(
 								url,
 								`forest:${key}:batch:${groupIndex++}`,
@@ -427,9 +407,6 @@ export class ForestRenderer {
 								return;
 							}
 						}
-
-						let attached = true;
-						let firstSlice = true;
 						for (
 							let start = 0;
 							start < group.length;
@@ -443,43 +420,17 @@ export class ForestRenderer {
 								await this.yieldForestPublicationIfNeeded(
 									publicationStartedAt,
 								);
-							const end = Math.min(
-								group.length,
-								start + FOREST_PLACEMENTS_PER_PUBLICATION,
-							);
-							attached = this.attachPackedThinInstanceBatch(
+							this.attachThinInstanceBatch(
 								chunk,
-								firstSlice ? model : null,
+								model,
 								placements,
 								group,
 								url,
 								start,
-								end,
-							);
-							if (!attached) break;
-							firstSlice = false;
-							model = null;
-						}
-
-						if (!attached) {
-							if (!model) {
-								const instance = await this.assets.instantiate(
-									url,
-									`forest:${key}:fallback:${groupIndex++}`,
-								);
-								model = instance.root;
-							}
-							if (!this.isCurrent(key, chunk)) {
-								model.dispose();
-								return;
-							}
-							await this.attachPackedFallbackBatch(
-								key,
-								chunk,
-								placements,
-								group,
-								url,
-								model,
+								Math.min(
+									group.length,
+									start + FOREST_PLACEMENTS_PER_PUBLICATION,
+								),
 							);
 							model = null;
 						}
@@ -548,45 +499,24 @@ export class ForestRenderer {
 		return performance.now();
 	}
 
-	private attachPackedThinInstanceBatch(
+	private attachThinInstanceBatch(
 		chunk: PendingForestChunk,
 		model: BABYLON.AbstractMesh | null,
 		placements: ForestPlacementBuffer,
 		placementIndices: readonly number[],
 		url: string,
-		start = 0,
-		end = placementIndices.length,
-	): boolean {
-		return this.attachThinInstanceBatchCore(
-			chunk,
-			model,
-			url,
-			end - start,
-			(index) =>
-				readForestPlacement(
-					placements.data,
-					placementIndices[start + index]!,
-					this.packedPlacementScratch,
-				),
-		);
-	}
-
-	private attachThinInstanceBatchCore(
-		chunk: PendingForestChunk,
-		model: BABYLON.AbstractMesh | null,
-		url: string,
-		placementCount: number,
-		readPlacement: (index: number) => ForestPlacement,
-	): boolean {
-		if (placementCount <= 0) return true;
-		const page = this.getOrCreatePage(chunk.x, chunk.z);
+		start: number,
+		end: number,
+	): void {
+		const placementCount = end - start;
+		if (placementCount <= 0) return;
+		const page = chunk.page;
 		let batch = page.thinBatches.get(url);
-		let metadata: SupportMetadata;
+		let metadata: SupportMetadata | undefined;
 
 		if (!batch) {
-			if (!model) return false;
-			const sourceMeshes = this.getThinInstanceSources(model);
-			if (!sourceMeshes) return false;
+			const sourceMeshes = model && this.getThinInstanceSources(model);
+			if (!model || !sourceMeshes) throw new Error(UNSUPPORTED_MODEL);
 			metadata = this.prepareThinInstanceSource(
 				model,
 				sourceMeshes,
@@ -608,21 +538,15 @@ export class ForestRenderer {
 				lastVisibilityVersion: -1,
 			};
 			page.thinBatches.set(url, batch);
+		} else if (model) {
+			const sourceMeshes = this.getThinInstanceSources(model);
+			if (batch.sourceMeshes.length !== sourceMeshes?.length)
+				throw new Error(UNSUPPORTED_MODEL);
+			metadata = this.getSupportMetadata(url, model);
+			model.dispose();
 		} else {
-			if (model) {
-				const sourceMeshes = this.getThinInstanceSources(model);
-				if (
-					!sourceMeshes ||
-					batch.sourceMeshes.length !== sourceMeshes.length
-				)
-					return false;
-				metadata = this.getSupportMetadata(url, model);
-				model.dispose();
-			} else {
-				const cachedMetadata = this.supportMetadata.get(url);
-				if (!cachedMetadata) return false;
-				metadata = cachedMetadata;
-			}
+			metadata = this.supportMetadata.get(url);
+			if (!metadata) throw new Error(UNSUPPORTED_MODEL);
 		}
 
 		const firstMatrixIndex = batch.instanceCount;
@@ -646,29 +570,21 @@ export class ForestRenderer {
 			batch.bufferInitialized = false;
 		}
 		const matrixData = batch.matrixData;
-		const chunkVisibilityKey = this.getChunkVisibilityKey(chunk);
 		for (let index = 0; index < placementCount; index++) {
-			const placementMatrix = this.createTerrainPlacementMatrix(
-				readPlacement(index),
-				metadata,
+			const placement = readForestPlacement(
+				placements.data,
+				placementIndices[start + index]!,
+				this.packedPlacementScratch,
 			);
-			placementMatrix.copyToArray(
+			this.createTerrainPlacementMatrix(placement, metadata).copyToArray(
 				matrixData,
 				(firstMatrixIndex + index) * 16,
 			);
-			batch.instanceChunkKeys.push(chunkVisibilityKey);
+			batch.instanceChunkKeys.push(chunk.key);
 		}
 		batch.instanceCount = nextInstanceCount;
 		batch.lastVisibilityVersion = -1;
 		this.refreshThinInstanceBatch(batch);
-		return true;
-	}
-
-	private getChunkVisibilityKey(chunk: {
-		key?: string;
-		root: BABYLON.TransformNode;
-	}): string {
-		return chunk.key ?? chunk.root.name;
 	}
 
 	private isChunkVisible(key: string): boolean {
@@ -779,52 +695,6 @@ export class ForestRenderer {
 		)
 			return null;
 		return meshes as BABYLON.Mesh[];
-	}
-
-	private async attachPackedFallbackBatch(
-		key: string,
-		chunk: PendingForestChunk,
-		placements: ForestPlacementBuffer,
-		placementIndices: readonly number[],
-		url: string,
-		firstModel: BABYLON.AbstractMesh,
-	): Promise<void> {
-		const firstIndex = placementIndices[0];
-		if (firstIndex === undefined) {
-			firstModel.dispose();
-			return;
-		}
-		this.attachModel(
-			chunk,
-			firstModel,
-			readForestPlacement(
-				placements.data,
-				firstIndex,
-				this.packedPlacementScratch,
-			),
-			url,
-		);
-		for (let index = 1; index < placementIndices.length; index++) {
-			if (!this.isCurrent(key, chunk)) return;
-			const instance = await this.assets.instantiate(
-				url,
-				`forest:${key}:fallback:${index}`,
-			);
-			if (!this.isCurrent(key, chunk)) {
-				instance.root.dispose();
-				return;
-			}
-			this.attachModel(
-				chunk,
-				instance.root,
-				readForestPlacement(
-					placements.data,
-					placementIndices[index]!,
-					this.packedPlacementScratch,
-				),
-				url,
-			);
-		}
 	}
 
 	private createTerrainPlacementMatrix(
@@ -964,98 +834,22 @@ export class ForestRenderer {
 		return this.placementSupportPoints;
 	}
 
-	private attachModel(
-		chunk: PendingForestChunk,
-		model: BABYLON.AbstractMesh,
-		placement: ForestPlacement,
-		url: string,
-	): void {
-		model.parent = chunk.root;
-		model.rotationQuaternion = null;
-		model.rotation.setAll(0);
-		model.position.set(0, 0, 0);
-		model.scaling.setAll(placement.scale);
-		this.updateHierarchyMatrices(model);
-		const metadata = this.getSupportMetadata(url, model);
-		const normal = new BABYLON.Vector3(
-			placement.normalX,
-			placement.normalY,
-			placement.normalZ,
-		);
-		let rotation = this.createTerrainRotation(placement.rotationY, normal);
-		model.rotationQuaternion = rotation;
-		this.updateHierarchyMatrices(model);
-		this.anchorSupport(model, metadata.center, placement.x, placement.z);
-
-		for (let iteration = 0; iteration < 2; iteration++) {
-			const supportPoints = this.worldSupportPoints(
-				model,
-				metadata.points,
-			);
-			const fittedNormal = this.fitSupportNormal(
-				supportPoints,
-				metadata.points.length,
-			);
-			if (!fittedNormal) break;
-			rotation = this.createTerrainRotation(
-				placement.rotationY,
-				fittedNormal,
-			);
-			model.rotationQuaternion = rotation;
-			this.updateHierarchyMatrices(model);
-			this.anchorSupport(
-				model,
-				metadata.center,
-				placement.x,
-				placement.z,
-			);
-		}
-
-		const anchor = this.transformRootPoint(model, metadata.center);
-		model.position.y += placement.y - anchor.y;
-		this.updateHierarchyMatrices(model);
-		this.conformBaseToTerrain(model, metadata);
-		this.map.prepareRenderable(model, true);
-		const meshes = [model, ...model.getChildMeshes()];
-		for (const mesh of meshes) this.prepareStaticNatureMesh(mesh);
-	}
-
 	private updateVisibility(): void {
 		const camera = this.scene.activeCamera;
 		if (!camera || this.pages.size === 0) return;
 		const zoneCenter = this.map.getZoneCenter();
-		const arcRotateCamera = camera as BABYLON.ArcRotateCamera;
-		const target = arcRotateCamera.target;
-		const viewport = camera.viewport;
-		const engine = camera.getEngine();
-		const width = engine.getRenderWidth();
-		const height = engine.getRenderHeight();
-		const cameraChanged =
+		const transformation = camera.getTransformationMatrix();
+		const viewProjection = transformation.m;
+		let changed =
 			this.visibilityDirty ||
 			this.lastVisibilityCamera !== camera ||
-			target.x !== this.lastVisibilityTargetX ||
-			target.y !== this.lastVisibilityTargetY ||
-			target.z !== this.lastVisibilityTargetZ ||
-			arcRotateCamera.alpha !== this.lastVisibilityAlpha ||
-			arcRotateCamera.beta !== this.lastVisibilityBeta ||
-			arcRotateCamera.radius !== this.lastVisibilityRadius ||
-			camera.fov !== this.lastVisibilityFov ||
-			camera.minZ !== this.lastVisibilityMinZ ||
-			camera.maxZ !== this.lastVisibilityMaxZ ||
-			width !== this.lastVisibilityWidth ||
-			height !== this.lastVisibilityHeight ||
-			viewport.x !== this.lastVisibilityViewportX ||
-			viewport.y !== this.lastVisibilityViewportY ||
-			viewport.width !== this.lastVisibilityViewportWidth ||
-			viewport.height !== this.lastVisibilityViewportHeight ||
 			zoneCenter.x !== this.lastVisibilityZoneCenterX ||
 			zoneCenter.z !== this.lastVisibilityZoneCenterZ;
-		if (!cameraChanged) return;
+		for (let index = 0; !changed && index < 16; index++)
+			changed = viewProjection[index] !== this.lastViewProjection[index];
+		if (!changed) return;
 
-		BABYLON.Frustum.GetPlanesToRef(
-			camera.getTransformationMatrix(),
-			this.frustumPlanes,
-		);
+		BABYLON.Frustum.GetPlanesToRef(transformation, this.frustumPlanes);
 		const displayRadiusSquared = this.map.CHUNK_DISPLAY_RADIUS ** 2;
 		let chunkVisibilityChanged = false;
 		for (const chunk of this.chunks.values()) {
@@ -1087,21 +881,7 @@ export class ForestRenderer {
 		if (chunkVisibilityChanged) this.visibilityVersion++;
 		this.refreshThinInstanceVisibility();
 		this.lastVisibilityCamera = camera;
-		this.lastVisibilityTargetX = target.x;
-		this.lastVisibilityTargetY = target.y;
-		this.lastVisibilityTargetZ = target.z;
-		this.lastVisibilityAlpha = arcRotateCamera.alpha;
-		this.lastVisibilityBeta = arcRotateCamera.beta;
-		this.lastVisibilityRadius = arcRotateCamera.radius;
-		this.lastVisibilityFov = camera.fov;
-		this.lastVisibilityMinZ = camera.minZ;
-		this.lastVisibilityMaxZ = camera.maxZ;
-		this.lastVisibilityWidth = width;
-		this.lastVisibilityHeight = height;
-		this.lastVisibilityViewportX = viewport.x;
-		this.lastVisibilityViewportY = viewport.y;
-		this.lastVisibilityViewportWidth = viewport.width;
-		this.lastVisibilityViewportHeight = viewport.height;
+		this.lastViewProjection.set(viewProjection);
 		this.lastVisibilityZoneCenterX = zoneCenter.x;
 		this.lastVisibilityZoneCenterZ = zoneCenter.z;
 		this.visibilityDirty = false;
@@ -1164,8 +944,6 @@ export class ForestRenderer {
 			const empty: SupportMetadata = {
 				points: [{ x: 0, y: 0, z: 0 }],
 				center: { x: 0, y: 0, z: 0 },
-				minY: 0,
-				band: 0,
 			};
 			this.supportMetadata.set(url, empty);
 			return empty;
@@ -1191,12 +969,7 @@ export class ForestRenderer {
 		center.x *= inversePointCount;
 		center.y *= inversePointCount;
 		center.z *= inversePointCount;
-		const metadata: SupportMetadata = {
-			points: supportPoints,
-			center,
-			minY,
-			band,
-		};
+		const metadata: SupportMetadata = { points: supportPoints, center };
 		this.supportMetadata.set(url, metadata);
 		return metadata;
 	}
@@ -1204,7 +977,7 @@ export class ForestRenderer {
 	private createTerrainRotation(
 		rotationY: number,
 		normal: BABYLON.Vector3,
-		result = new BABYLON.Quaternion(),
+		result: BABYLON.Quaternion,
 	): BABYLON.Quaternion {
 		const up = this.placementUp.copyFrom(normal);
 		if (up.lengthSquared() < 0.000001) up.set(0, 1, 0);
@@ -1224,52 +997,10 @@ export class ForestRenderer {
 		return BABYLON.Quaternion.FromLookDirectionLHToRef(forward, up, result);
 	}
 
-	private anchorSupport(
-		root: BABYLON.AbstractMesh,
-		center: SupportPoint,
-		x: number,
-		z: number,
-	): void {
-		const anchor = this.transformRootPoint(root, center);
-		root.position.x += x - anchor.x;
-		root.position.z += z - anchor.z;
-		this.updateHierarchyMatrices(root);
-	}
-
-	private transformRootPoint(
-		root: BABYLON.AbstractMesh,
-		point: SupportPoint,
-	): BABYLON.Vector3 {
-		return BABYLON.Vector3.TransformCoordinates(
-			new BABYLON.Vector3(point.x, point.y, point.z),
-			root.getWorldMatrix(),
-		);
-	}
-
-	private worldSupportPoints(
-		root: BABYLON.AbstractMesh,
-		points: readonly SupportPoint[],
-	): readonly BABYLON.Vector3[] {
-		const worldMatrix = root.getWorldMatrix();
-		while (this.placementSupportPoints.length < points.length)
-			this.placementSupportPoints.push(BABYLON.Vector3.Zero());
-		for (let index = 0; index < points.length; index++) {
-			const point = points[index]!;
-			BABYLON.Vector3.TransformCoordinatesFromFloatsToRef(
-				point.x,
-				point.y,
-				point.z,
-				worldMatrix,
-				this.placementSupportPoints[index]!,
-			);
-		}
-		return this.placementSupportPoints;
-	}
-
 	private fitSupportNormal(
 		points: readonly BABYLON.Vector3[],
-		count = points.length,
-		result = new BABYLON.Vector3(),
+		count: number,
+		result: BABYLON.Vector3,
 	): BABYLON.Vector3 | null {
 		if (count < 3) return null;
 		let meanX = 0;
@@ -1311,105 +1042,6 @@ export class ForestRenderer {
 		const slopeZ = (zGround * xx - xGround * xz) / determinant;
 		result.set(-slopeX, 1, -slopeZ);
 		return result.lengthSquared() < 0.000001 ? null : result.normalize();
-	}
-
-	private conformBaseToTerrain(
-		root: BABYLON.AbstractMesh,
-		metadata: SupportMetadata,
-	): void {
-		const rootWorld = root.getWorldMatrix();
-		const inverseRootWorld = BABYLON.Matrix.Invert(rootWorld);
-		const up = BABYLON.Vector3.TransformNormal(BABYLON.Axis.Y, rootWorld);
-		if (up.lengthSquared() < 0.000001) return;
-		up.normalize();
-		if (up.y < 0) up.scaleInPlace(-1);
-
-		const worldPoint = BABYLON.Vector3.Zero();
-		const rootPoint = BABYLON.Vector3.Zero();
-		const targetWorldPoint = BABYLON.Vector3.Zero();
-		const localPoint = BABYLON.Vector3.Zero();
-		for (const mesh of [root, ...root.getChildMeshes()]) {
-			const sourcePositions = mesh.getVerticesData(
-				BABYLON.VertexBuffer.PositionKind,
-			);
-			if (!sourcePositions) continue;
-			const positions = new Float32Array(sourcePositions);
-			const worldMatrix = mesh.getWorldMatrix();
-			const inverseWorldMatrix = BABYLON.Matrix.Invert(worldMatrix);
-			let changed = false;
-			for (let index = 0; index + 2 < positions.length; index += 3) {
-				BABYLON.Vector3.TransformCoordinatesFromFloatsToRef(
-					positions[index],
-					positions[index + 1],
-					positions[index + 2],
-					worldMatrix,
-					worldPoint,
-				);
-				BABYLON.Vector3.TransformCoordinatesToRef(
-					worldPoint,
-					inverseRootWorld,
-					rootPoint,
-				);
-				if (rootPoint.y > metadata.minY + metadata.band) continue;
-
-				let distance =
-					(this.map.getGroundHeight(worldPoint.x, worldPoint.z) +
-						BASE_CLEARANCE -
-						worldPoint.y) /
-					up.y;
-				for (
-					let iteration = 0;
-					iteration < CONTACT_ITERATIONS;
-					iteration++
-				) {
-					const sampleX = worldPoint.x + up.x * distance;
-					const sampleZ = worldPoint.z + up.z * distance;
-					distance =
-						(this.map.getGroundHeight(sampleX, sampleZ) +
-							BASE_CLEARANCE -
-							worldPoint.y) /
-						up.y;
-				}
-				if (Math.abs(distance) <= CONTACT_EPSILON) continue;
-				targetWorldPoint
-					.copyFrom(worldPoint)
-					.addInPlace(up.scale(distance));
-				BABYLON.Vector3.TransformCoordinatesToRef(
-					targetWorldPoint,
-					inverseWorldMatrix,
-					localPoint,
-				);
-				positions[index] = localPoint.x;
-				positions[index + 1] = localPoint.y;
-				positions[index + 2] = localPoint.z;
-				changed = true;
-			}
-			if (!changed) continue;
-
-			if (mesh instanceof BABYLON.Mesh) mesh.makeGeometryUnique();
-			mesh.setVerticesData(
-				BABYLON.VertexBuffer.PositionKind,
-				positions,
-				false,
-			);
-			const indices = mesh.getIndices(true);
-			const normals = mesh.getVerticesData(
-				BABYLON.VertexBuffer.NormalKind,
-			);
-			if (!indices || !normals) continue;
-			const recomputedNormals = new Float32Array(normals.length);
-			BABYLON.VertexData.ComputeNormals(
-				positions,
-				indices,
-				recomputedNormals,
-			);
-			mesh.setVerticesData(
-				BABYLON.VertexBuffer.NormalKind,
-				recomputedNormals,
-				false,
-			);
-		}
-		this.updateHierarchyMatrices(root);
 	}
 
 	private updateHierarchyMatrices(root: BABYLON.AbstractMesh): void {

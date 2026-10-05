@@ -79,16 +79,18 @@ class RemotePlayerView {
 	}
 }
 
-type AuthoritativeMovementState = Pick<
-	Player,
-	| 'x'
-	| 'y'
-	| 'z'
-	| 'rotationY'
-	| 'velocityY'
-	| 'isGrounded'
-	| 'lastProcessedSeq'
->;
+const MOVEMENT_KEYS = [
+	'x',
+	'y',
+	'z',
+	'rotationY',
+	'velocityY',
+	'isGrounded',
+] as const;
+const SNAPSHOT_KEYS = [...MOVEMENT_KEYS, 'lastProcessedSeq'] as const;
+const AXES = ['x', 'y', 'z'] as const;
+
+type AuthoritativeMovementState = Pick<Player, (typeof SNAPSHOT_KEYS)[number]>;
 
 interface ReconciliationSnapshot extends AuthoritativeMovementState {
 	moveSpeed: number;
@@ -102,15 +104,28 @@ type RemoteTarget = Vec3d & { rotationY: number };
 function isAuthoritativeMovementState(
 	state: Partial<AuthoritativeMovementState>,
 ): state is AuthoritativeMovementState {
-	return (
-		typeof state.x === 'number' &&
-		typeof state.y === 'number' &&
-		typeof state.z === 'number' &&
-		typeof state.rotationY === 'number' &&
-		typeof state.velocityY === 'number' &&
-		typeof state.isGrounded === 'boolean' &&
-		typeof state.lastProcessedSeq === 'number'
-	);
+	for (let i = 0; i < SNAPSHOT_KEYS.length; i++) {
+		const key = SNAPSHOT_KEYS[i];
+		const type = key === 'isGrounded' ? 'boolean' : 'number';
+		if (typeof state[key] !== type) return false;
+	}
+	return true;
+}
+
+function copyFields<T, K extends keyof T>(
+	dst: T,
+	src: Pick<T, K>,
+	keys: readonly K[],
+): void {
+	for (let i = 0; i < keys.length; i++) dst[keys[i]] = src[keys[i]];
+}
+
+export function copyMoveInput(dst: MoveInput, src: MoveInput): void {
+	dst.forward = src.forward;
+	dst.backward = src.backward;
+	dst.right = src.right;
+	dst.left = src.left;
+	dst.cameraYaw = src.cameraYaw;
 }
 
 export class ServerOrchestrator {
@@ -179,13 +194,9 @@ export class ServerOrchestrator {
 
 	setUnsentPrediction(input: MoveInput, deltaTime: number) {
 		const pending = this.unsentPredictionInput;
-		pending.forward = input.forward;
-		pending.backward = input.backward;
-		pending.right = input.right;
-		pending.left = input.left;
+		copyMoveInput(pending, input);
 		pending.jump = false;
 		pending.deltaTime = deltaTime;
-		pending.cameraYaw = input.cameraYaw;
 	}
 
 	setReviveIntent(enabled: boolean) {
@@ -232,21 +243,12 @@ export class ServerOrchestrator {
 		this.remotePlayers.forEach(({ mesh }, sessionId) => {
 			const target = this.remoteTargets.get(sessionId);
 			if (!target) return;
-			mesh.position.x = BABYLON.Scalar.Lerp(
-				mesh.position.x,
-				target.x,
-				lerpFactor,
-			);
-			mesh.position.y = BABYLON.Scalar.Lerp(
-				mesh.position.y,
-				target.y,
-				lerpFactor,
-			);
-			mesh.position.z = BABYLON.Scalar.Lerp(
-				mesh.position.z,
-				target.z,
-				lerpFactor,
-			);
+			for (let i = 0; i < AXES.length; i++)
+				mesh.position[AXES[i]] = BABYLON.Scalar.Lerp(
+					mesh.position[AXES[i]],
+					target[AXES[i]],
+					lerpFactor,
+				);
 			const targetRotation = target.rotationY + Math.PI;
 			mesh.rotation.y = BABYLON.Scalar.LerpAngle(
 				mesh.rotation.y,
@@ -305,20 +307,9 @@ export class ServerOrchestrator {
 		players.forEach((player, sessionId) => {
 			const aura = player.aura;
 			if (!aura || aura.radius <= 0) return;
-			let x = player.x;
-			let z = player.z;
-			if (sessionId === this.room.sessionId) {
-				if (this.player) {
-					x = this.player.position.x;
-					z = this.player.position.z;
-				}
-			} else {
-				const view = this.remotePlayers.get(sessionId);
-				if (view) {
-					x = view.mesh.position.x;
-					z = view.mesh.position.z;
-				}
-			}
+			const mesh = this.getPlayerMesh(sessionId);
+			const x = mesh ? mesh.position.x : player.x;
+			const z = mesh ? mesh.position.z : player.z;
 			const output = this.auras[count++];
 			if (output) {
 				output.x = x;
@@ -366,12 +357,7 @@ export class ServerOrchestrator {
 		this.discardAcknowledgedInputs(acknowledged);
 
 		const state = this.reconciliationState;
-		state.x = authoritativeState.x;
-		state.y = authoritativeState.y;
-		state.z = authoritativeState.z;
-		state.rotationY = authoritativeState.rotationY;
-		state.velocityY = authoritativeState.velocityY;
-		state.isGrounded = authoritativeState.isGrounded;
+		copyFields(state, authoritativeState, MOVEMENT_KEYS);
 
 		const world = this.mapGen.getWorld();
 		this.movementBoundary.centerX = this.room.state.rayX;
@@ -407,13 +393,7 @@ export class ServerOrchestrator {
 		this.player.position.z = state.z;
 		this.player.rotation.y = state.rotationY;
 		const snapshot = this.lastReconciliation;
-		snapshot.x = authoritativeState.x;
-		snapshot.y = authoritativeState.y;
-		snapshot.z = authoritativeState.z;
-		snapshot.rotationY = authoritativeState.rotationY;
-		snapshot.velocityY = authoritativeState.velocityY;
-		snapshot.isGrounded = authoritativeState.isGrounded;
-		snapshot.lastProcessedSeq = authoritativeState.lastProcessedSeq;
+		copyFields(snapshot, authoritativeState, SNAPSHOT_KEYS);
 		snapshot.moveSpeed = moveSpeed;
 		snapshot.pendingInputHead = this.pendingInputHead;
 		snapshot.pendingInputLength = this.pendingInputs.length;
@@ -428,17 +408,11 @@ export class ServerOrchestrator {
 	): boolean {
 		if (!this.hasLastReconciliation) return false;
 		const previous = this.lastReconciliation;
+		for (let i = 0; i < SNAPSHOT_KEYS.length; i++) {
+			const key = SNAPSHOT_KEYS[i];
+			if (!Object.is(previous[key], serverState[key])) return false;
+		}
 		return (
-			Object.is(previous.x, serverState.x) &&
-			Object.is(previous.y, serverState.y) &&
-			Object.is(previous.z, serverState.z) &&
-			Object.is(previous.rotationY, serverState.rotationY) &&
-			Object.is(previous.velocityY, serverState.velocityY) &&
-			previous.isGrounded === serverState.isGrounded &&
-			Object.is(
-				previous.lastProcessedSeq,
-				serverState.lastProcessedSeq,
-			) &&
 			Object.is(previous.moveSpeed, moveSpeed) &&
 			previous.pendingInputHead === this.pendingInputHead &&
 			previous.pendingInputLength === this.pendingInputs.length &&
