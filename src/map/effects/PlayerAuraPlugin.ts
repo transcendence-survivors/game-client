@@ -97,10 +97,10 @@ uniform vec4 auraParams;
 					if (radius <= 0.0) { continue; }
 					float dist = distance(vPositionW.xz, a.xy);
 					if (dist > radius) { continue; }
-					float t = dist / radius;                       // 0 centre -> 1 bord
-					float fill = (1.0 - t) * 0.10;                 // remplissage doux
-					float ring = smoothstep(0.82, 1.0, t) * 0.7;   // anneau au bord
-					float phase = fract(auraT * a.w);              // onde par attaque
+					float t = dist / radius;                       // 0 center -> 1 edge
+					float fill = (1.0 - t) * 0.10;                 // smooth fill
+					float ring = smoothstep(0.82, 1.0, t) * 0.7;   // edge ring
+					float phase = fract(auraT * a.w);              // wave by attack
 					float wave = smoothstep(0.07, 0.0, abs(t - phase)) * (1.0 - phase) * 0.9;
 					auraAccum += auraColor * (fill + ring + wave);
 				}
