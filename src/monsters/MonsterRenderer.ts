@@ -18,11 +18,6 @@ import { getMonsterModelUrl } from '../assets/models';
 import { AsyncViewRegistry } from '../combat/AsyncViewRegistry';
 import { CleanupBag } from '../CleanupBag';
 import {
-	extractStaticAnimationPoses,
-	removeGloballyRedundantTransformAnimations,
-	type StaticAnimationPoses,
-} from './AnimationOptimization';
-import {
 	isMonsterInCameraEnvelope,
 	MONSTER_RENDER_CULLING_CONFIG,
 	type PlanarCameraView,
@@ -35,11 +30,6 @@ const FATAL_BOSS_HEAD_OFFSET = 9;
 const MONSTER_REMOVE_GRACE_S = 0.25;
 const DEATH_VIEW_LOAD_GRACE_S = 1;
 const NEXT_BOSS_PREWARM_DELAY_MS = 2_000;
-
-interface PrewarmedBossModel {
-	model: ModelInstance;
-	staticPoses: StaticAnimationPoses;
-}
 
 export interface MonsterRendererStats {
 	total: number;
@@ -73,7 +63,7 @@ export class MonsterRenderer {
 	};
 	private readonly prewarmedBosses = new Map<
 		string,
-		Promise<PrewarmedBossModel>
+		Promise<ModelInstance>
 	>();
 	private readonly bossPrewarmTimers = new Map<string, number>();
 	private prewarmSequence = 0;
@@ -103,7 +93,6 @@ export class MonsterRenderer {
 			scene,
 			mapGen,
 			this.assets,
-			(url) => this.prepareModel(url),
 		);
 		this.damageFlashMaterial = new BABYLON.StandardMaterial(
 			'monsterDamageFlashMaterial',
@@ -194,8 +183,7 @@ export class MonsterRenderer {
 	private async createPrewarmedBoss(
 		kind: string,
 		url: string,
-	): Promise<PrewarmedBossModel> {
-		await this.prepareModel(url);
+	): Promise<ModelInstance> {
 		const model = await this.assets.instantiate(
 			url,
 			`boss-prewarm:${kind}:${this.prewarmSequence++}`,
@@ -205,29 +193,21 @@ export class MonsterRenderer {
 			this.disposeModel(model);
 			throw new Error('monster renderer disposed during boss prewarm');
 		}
-		const staticPoses = this.prepareModelInstance(model);
+		this.prepareModelInstance(model);
 		model.root.setEnabled(false);
-		return { model, staticPoses };
+		return model;
 	}
 
 	private async acquireBossModel(
 		kind: string,
 		url: string,
-	): Promise<PrewarmedBossModel> {
+	): Promise<ModelInstance> {
 		const pending = this.prewarmedBosses.get(kind);
 		if (pending) {
 			this.prewarmedBosses.delete(kind);
 			return pending;
 		}
 		return this.createPrewarmedBoss(kind, url);
-	}
-
-	private prepareModel(url: string): Promise<void> {
-		return this.assets.prepare(url, (container) => {
-			removeGloballyRedundantTransformAnimations(
-				container.animationGroups,
-			);
-		});
 	}
 
 	update(deltaTime: number): void {
@@ -419,28 +399,20 @@ export class MonsterRenderer {
 				if (!url)
 					throw new Error(`Unknown monster model '${monster.kind}'`);
 				let model: ModelInstance;
-				let staticPoses: StaticAnimationPoses;
 				if (monster.isBoss) {
-					const prewarmed = await this.acquireBossModel(
-						monster.kind,
-						url,
-					);
-					model = prewarmed.model;
-					staticPoses = prewarmed.staticPoses;
+					model = await this.acquireBossModel(monster.kind, url);
 					model.root.setEnabled(true);
 				} else {
-					await this.prepareModel(url);
 					model = await this.assets.instantiate(
 						url,
 						`${monster.kind}_${monster.isElite ? 'elite' : 'normal'}`,
 						{ doNotInstantiate: true },
 					);
-					staticPoses = this.prepareModelInstance(model);
+					this.prepareModelInstance(model);
 				}
 				const view = new MonsterView(
 					model.root,
 					model.animationGroups,
-					staticPoses,
 					monster.kind,
 					monster.isBoss,
 					monster.animState,
@@ -466,11 +438,9 @@ export class MonsterRenderer {
 		}
 	}
 
-	private prepareModelInstance(model: ModelInstance): StaticAnimationPoses {
-		const staticPoses = extractStaticAnimationPoses(model.animationGroups);
+	private prepareModelInstance(model: ModelInstance): void {
 		model.animationGroups.forEach((animation) => animation.stop());
 		this.mapGen.prepareRenderable(model.root, false);
-		return staticPoses;
 	}
 
 	private disposeModel(model: ModelInstance): void {
@@ -497,7 +467,7 @@ export class MonsterRenderer {
 		this.bossPrewarmTimers.clear();
 		for (const pending of this.prewarmedBosses.values())
 			void pending
-				.then(({ model }) => this.disposeModel(model))
+				.then((model) => this.disposeModel(model))
 				.catch(() => {});
 		this.prewarmedBosses.clear();
 		this.bakedMonsters.dispose();

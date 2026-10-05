@@ -6,14 +6,9 @@ import {
 	MONSTER_MODEL_SCALE,
 	type MonsterAnimState,
 } from '@transcendence/game-shared';
-import {
-	animationFramesPerSecond,
-	applyStaticAnimationPose,
-	type StaticAnimationPose,
-	type StaticAnimationPoses,
-} from './AnimationOptimization';
 import { MONSTER_RENDER_CULLING_CONFIG } from './MonsterRenderCulling';
 import {
+	animationFramesPerSecond,
 	MONSTER_DAMAGE_FLASH_DURATION_S,
 	MONSTER_GROUND_HEIGHT_INTERVAL_S,
 	MONSTER_GROUND_LERP_SPEED,
@@ -77,10 +72,6 @@ function animationDurationS(group: BABYLON.AnimationGroup): number {
 export class MonsterView {
 	private root!: BABYLON.TransformNode;
 	private animations = new Map<string, BABYLON.AnimationGroup>();
-	private readonly staticAnimationPoses = new Map<
-		string,
-		StaticAnimationPose
-	>();
 	private currentAnimation: MonsterPresentationAnimation | null = null;
 	private renderEnabled = true;
 	private readonly target = { x: 0, z: 0, rotationY: 0 };
@@ -115,7 +106,6 @@ export class MonsterView {
 	constructor(
 		root: BABYLON.TransformNode,
 		animationGroups: BABYLON.AnimationGroup[],
-		staticAnimationPoses: StaticAnimationPoses,
 		kind: string,
 		isBoss: boolean,
 		initialAnimationState: MonsterAnimState,
@@ -146,12 +136,8 @@ export class MonsterView {
 				mesh.isPickable = false;
 				mesh.checkCollisions = false;
 			}
-		for (const group of animationGroups) {
-			const name = semanticAnimationName(group.name);
-			this.animations.set(name, group);
-			const pose = staticAnimationPoses.get(group);
-			if (pose) this.staticAnimationPoses.set(name, pose);
-		}
+		for (const group of animationGroups)
+			this.animations.set(semanticAnimationName(group.name), group);
 		this.play(
 			initialAnimationState,
 			true,
@@ -339,7 +325,6 @@ export class MonsterView {
 			return;
 		}
 		this.animations.get(this.currentAnimation ?? '')?.stop(true);
-		applyStaticAnimationPose(this.staticAnimationPoses.get(animation));
 		this.sampleAnimation(animation, animationTimeS ?? 0, loop);
 		this.currentAnimation = animation;
 	}
@@ -493,7 +478,6 @@ export class MonsterView {
 		this.headAnchor?.dispose();
 		this.animations.forEach((group) => group.dispose());
 		this.animations.clear();
-		this.staticAnimationPoses.clear();
 		this.root.dispose();
 	}
 }

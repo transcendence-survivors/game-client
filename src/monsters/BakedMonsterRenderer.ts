@@ -26,10 +26,10 @@ import {
 	MONSTER_MODEL_YAW_OFFSET,
 	MONSTER_POSITION_LERP_SPEED,
 	MONSTER_PRESENTATION_ANIMATIONS,
+	animationFramesPerSecond,
 	type MonsterPresentationAnimation,
 	type MonsterPresentationState,
 } from './MonsterPresentation';
-import { animationFramesPerSecond } from './AnimationOptimization';
 
 const DEFAULT_ANIMATION_FPS = 30;
 const INITIAL_BATCH_CAPACITY = 32;
@@ -150,7 +150,6 @@ export class BakedMonsterRenderer {
 	private readonly scene: BABYLON.Scene;
 	private readonly mapGen: MapGenerator;
 	private readonly assets: ModelAssetLibrary;
-	private readonly prepareModel: (url: string) => Promise<void>;
 	private readonly instanceScale = BABYLON.Vector3.One();
 	private readonly instanceRotation = BABYLON.Quaternion.Identity();
 	private readonly instancePosition = BABYLON.Vector3.Zero();
@@ -161,12 +160,10 @@ export class BakedMonsterRenderer {
 		scene: BABYLON.Scene,
 		mapGen: MapGenerator,
 		assets: ModelAssetLibrary,
-		prepareModel: (url: string) => Promise<void>,
 	) {
 		this.scene = scene;
 		this.mapGen = mapGen;
 		this.assets = assets;
-		this.prepareModel = prepareModel;
 	}
 
 	async add(monster: Monster, id: string): Promise<void> {
@@ -305,7 +302,6 @@ export class BakedMonsterRenderer {
 	}
 
 	private async createBatch(url: string, kind: string): Promise<BakedBatch> {
-		await this.prepareModel(url);
 		const model = await this.assets.instantiate(url, `vat:${kind}`, {
 			doNotInstantiate: true,
 		});
