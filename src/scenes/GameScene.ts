@@ -117,8 +117,11 @@ export class GameScene {
 	private touchCameraLastX = 0;
 	private touchCameraLastY = 0;
 
+	private touchPrimaryInput = false;
+
 	constructor(engine: Engine, room: COLYSEUS.Room<GameState>, seed: number) {
 		this.engine = engine;
+		this.touchPrimaryInput = isInputTouch();
 		this.ready = this.init(room, seed);
 	}
 
@@ -218,7 +221,7 @@ export class GameScene {
 				);
 			});
 
-			if (navigator.maxTouchPoints > 0) {
+			if (this.touchPrimaryInput) {
 				this.moveJoystick = new BABYLON.VirtualJoystick(true);
 				if (BABYLON.VirtualJoystick.Canvas)
 					BABYLON.VirtualJoystick.Canvas.style.clipPath =
@@ -495,7 +498,7 @@ export class GameScene {
 			const toggleSettings = pKeyPressed && !this.settingsKeyWasPressed;
 			this.settingsKeyWasPressed = pKeyPressed;
 			if (toggleSettings) {
-				if (navigator.maxTouchPoints > 0) return;
+				if (this.touchPrimaryInput) return;
 				if (!this.settings.isOpen()) {
 					this.settings.open();
 					document.exitPointerLock();
@@ -552,7 +555,7 @@ export class GameScene {
 
 	private boundOnClick = () => {
 		if (this.settings.isOpen()) return;
-		if (navigator.maxTouchPoints > 0) return;
+		if (this.touchPrimaryInput) return;
 		const canvas = this.engine.getRenderingCanvas();
 		if (!canvas) return;
 		try {
@@ -641,4 +644,11 @@ export class GameScene {
 			this.touchCameraPointerId = null;
 		});
 	}
+}
+
+function isInputTouch() {
+	const mq = (q: string) => window.matchMedia(q).matches;
+
+	if (mq('(pointer: coarse)') && mq('(hover: none)')) return true;
+	return false;
 }
