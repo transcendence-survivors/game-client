@@ -6,7 +6,7 @@ import { InputManager } from '../server/InputManager';
 import { MapGenerator } from '../map/MapGenerator';
 import { DebugMenu } from '../hud/DebugMenu';
 import { ServerOrchestrator } from '../server/ServerOrchestrator';
-import { ForestRenderer } from '../map/nature/ForestRenderer';
+import { NatureRenderer } from '../map/nature/NatureRenderer';
 import { MonsterRenderer } from '../monsters/MonsterRenderer';
 
 import {
@@ -65,7 +65,7 @@ export class GameScene {
 	private input!: InputManager;
 	private player!: BABYLON.AbstractMesh;
 	private mapGen!: MapGenerator;
-	private forest!: ForestRenderer;
+	private nature!: NatureRenderer;
 	private debugMenu!: DebugMenu;
 	private playerAssets!: ModelAssetLibrary;
 
@@ -175,10 +175,9 @@ export class GameScene {
 
 			this.server.setPlayer(this.player);
 			this.track(new LevelUpShaderEffect(this.scene, this.player, room));
-			this.forest = this.track(
-				new ForestRenderer(this.scene, this.mapGen, this.playerAssets),
+			this.nature = this.track(
+				new NatureRenderer(this.mapGen, this.playerAssets),
 			);
-			this.forest.update(this.player.position);
 			this.input = this.track(new InputManager(this.scene));
 			this.server.listenToState();
 			this.monsters = this.track(
@@ -466,7 +465,7 @@ export class GameScene {
 			)
 				cameraTarget.copyFrom(playerPosition);
 			this.clampCameraToTerrain(deltaTime);
-			this.forest.update(this.player.position);
+			this.nature.update();
 			this.hud.update();
 			this.statsPanel.update();
 			this.updateReviveIntent(downed);
