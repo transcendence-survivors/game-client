@@ -3,6 +3,7 @@ import {
 	VertexData,
 	type Scene,
 	type StandardMaterial,
+	Vector3,
 } from '@babylonjs/core';
 import {
 	TERRAIN_SUBDIVISIONS_PER_CELL,
@@ -31,6 +32,7 @@ interface TerrainGeometryBuffers {
 
 const terrainGeometryPools = new Map<number, TerrainGeometryBuffers[]>();
 const MAX_POOLED_TERRAIN_GEOMETRIES = 4;
+const NATURE_VISIBILITY_HEADROOM = new Vector3(0, 16, 0);
 
 function acquireTerrainGeometryBuffers(
 	vertexCount: number,
@@ -156,6 +158,11 @@ function buildChunkMesh(
 		vd.normals = normals;
 		vd.uvs = uvs;
 		vd.applyToMesh(mesh);
+		const bounds = mesh.getBoundingInfo();
+		bounds.reConstruct(
+			bounds.minimum,
+			bounds.maximum.add(NATURE_VISIBILITY_HEADROOM),
+		);
 		mesh.onDisposeObservable.addOnce(releaseBuffers);
 		mesh.sideOrientation = Mesh.FRONTSIDE;
 		mesh.position.set(originX, 0, originZ);

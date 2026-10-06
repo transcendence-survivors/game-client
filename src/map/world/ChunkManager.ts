@@ -7,6 +7,12 @@ import type { TerrainSurfaceData } from './TerrainSurface';
 
 interface LoadedChunk extends Vec2d {
 	chunk: TerrainChunk;
+	visible: boolean;
+}
+
+export interface ChunkVisibilityListener {
+	onChunkVisibilityChanged(x: number, z: number, visible: boolean): void;
+	onChunkDisposed(x: number, z: number): void;
 }
 
 interface PendingBuild extends Readonly<Vec2d> {
@@ -57,6 +63,7 @@ export class ChunkManager {
 	private lastCx = Number.NaN;
 	private lastCz = Number.NaN;
 	private disposed = false;
+	private listener: ChunkVisibilityListener | null = null;
 
 	constructor(
 		scene: Scene,
@@ -110,7 +117,7 @@ export class ChunkManager {
 					Math.abs(loaded.x - cx) > this.view + 1 ||
 					Math.abs(loaded.z - cz) > this.view + 1
 				) {
-					loaded.chunk.dispose();
+					this.disposeChunk(loaded);
 					this.chunks.delete(key);
 				}
 			}
@@ -130,9 +137,16 @@ export class ChunkManager {
 		this.updateVisibility(p.x, p.z);
 	}
 
+	setListener(listener: ChunkVisibilityListener | null): void {
+		this.listener = listener;
+		for (const loaded of this.chunks.values())
+			if (loaded.visible)
+				listener?.onChunkVisibilityChanged(loaded.x, loaded.z, true);
+	}
+
 	clear(): void {
 		this.queueGeneration++;
-		for (const loaded of this.chunks.values()) loaded.chunk.dispose();
+		for (const loaded of this.chunks.values()) this.disposeChunk(loaded);
 		this.chunks.clear();
 		this.pendingBuilds.clear();
 		for (
@@ -278,10 +292,12 @@ export class ChunkManager {
 			} finally {
 				ready.surface.release?.();
 			}
+			chunk.mesh.setEnabled(false);
 			this.chunks.set(ready.key, {
 				x: ready.x,
 				z: ready.z,
 				chunk,
+				visible: false,
 			});
 			this.visibilityDirty = true;
 			if (
@@ -330,8 +346,14 @@ export class ChunkManager {
 					centerX,
 					centerZ,
 				) && loaded.chunk.mesh.isInFrustum(this.frustumPlanes);
-			if (loaded.chunk.mesh.isEnabled() !== visible)
-				loaded.chunk.mesh.setEnabled(visible);
+			if (loaded.visible === visible) continue;
+			loaded.visible = visible;
+			loaded.chunk.mesh.setEnabled(visible);
+			this.listener?.onChunkVisibilityChanged(
+				loaded.x,
+				loaded.z,
+				visible,
+			);
 		}
 
 		this.lastVisibilityCamera = camera;
@@ -340,6 +362,11 @@ export class ChunkManager {
 		for (let index = 0; index < 16; index++)
 			this.lastViewProjection[index] = viewProjection[index]!;
 		this.visibilityDirty = false;
+	}
+
+	private disposeChunk(loaded: LoadedChunk): void {
+		loaded.chunk.dispose();
+		this.listener?.onChunkDisposed(loaded.x, loaded.z);
 	}
 
 	private intersectsDisplayCircle(

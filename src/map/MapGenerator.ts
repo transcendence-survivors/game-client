@@ -5,7 +5,10 @@ import {
 	ACCESS_RADIUS,
 	CHUNK_DISPLAY_RADIUS as SHARED_CHUNK_DISPLAY_RADIUS,
 } from '@transcendence/game-shared';
-import { ChunkManager } from './world/ChunkManager';
+import {
+	ChunkManager,
+	type ChunkVisibilityListener,
+} from './world/ChunkManager';
 import { SunRayVolumetric } from './effects/SunRayVolumetric';
 import { RadialLightingPostProcess } from './effects/RadialLightingPostProcess';
 import {
@@ -142,6 +145,10 @@ export class MapGenerator {
 
 	getGenerationClient(): WorldGenerationClient {
 		return this.generation;
+	}
+
+	setChunkVisibilityListener(listener: ChunkVisibilityListener | null) {
+		this.chunkManager.setListener(listener);
 	}
 
 	prepareRenderable(root: BABYLON.TransformNode, includeRoot = true) {
