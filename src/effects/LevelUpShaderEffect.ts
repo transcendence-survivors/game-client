@@ -72,7 +72,7 @@ void main(void) {
 }
 `;
 
-export function levelUpPulseProgress(elapsedS: number): number {
+function levelUpPulseProgress(elapsedS: number): number {
 	if (!Number.isFinite(elapsedS)) return 1;
 	return clamp01(elapsedS / EFFECT_DURATION_S);
 }

@@ -4,7 +4,7 @@ const WALK_FRAME_RATE = 30;
 const WALK_CYCLE_FRAMES = 30;
 const WALK_SWAY = 0.035;
 
-export const PLAYER_CLIP_CANDIDATES = {
+const PLAYER_CLIP_CANDIDATES = {
 	walk: ['Walk_Loop', 'Walk_Carry_Loop', 'Walk_Formal_Loop'],
 	idle: ['Idle_No_Loop', 'Idle_Rail_Loop'],
 	knockdown: ['Hit_Knockback'],
@@ -23,14 +23,14 @@ export interface PlayerAnimationController {
 	dispose(): void;
 }
 
-export function clipNameMatches(groupName: string, clipName: string): boolean {
+function clipNameMatches(groupName: string, clipName: string): boolean {
 	return (
 		groupName.slice(groupName.lastIndexOf(':') + 1).toLowerCase() ===
 		clipName.toLowerCase()
 	);
 }
 
-export function findPlayerClip<TGroup extends { name: string }>(
+function findPlayerClip<TGroup extends { name: string }>(
 	animationGroups: readonly TGroup[],
 	candidates: readonly string[],
 ): TGroup | undefined {

@@ -14,7 +14,7 @@ function channel(value: number): number {
 	return Math.max(0, Math.min(255, Math.round(value)));
 }
 
-export function createProceduralGroundTextureData(seed: number): Uint8Array {
+function createProceduralGroundTextureData(seed: number): Uint8Array {
 	const size = GROUND_TEXTURE_SIZE;
 	const worldScale = GROUND_TEXTURE_WORLD_SIZE / size;
 	const data = new Uint8Array(size * size * 4);

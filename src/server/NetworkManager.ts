@@ -61,7 +61,7 @@ export function clearStoredRoom() {
 	sessionStorage.removeItem(STORAGE_COLYSEUS_ROOM_ID_STR);
 }
 
-export function persistRoom<T>(room: Room<T>): Room<T> {
+function persistRoom<T>(room: Room<T>): Room<T> {
 	const loose = room as Room<any>;
 	loose.reconnection.maxRetries = 0;
 	const save = () => {

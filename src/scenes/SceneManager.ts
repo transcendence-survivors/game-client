@@ -8,7 +8,7 @@ import { WaitingScreen } from './WaitingScreen';
 import type { UserInfos } from '../../../shared-package/src/utils/Types';
 import { gameI18n, type GameLocale } from '../i18n';
 
-export interface ManagedScene {
+interface ManagedScene {
 	render(): void;
 	dispose(): void;
 	ready: Promise<void>;

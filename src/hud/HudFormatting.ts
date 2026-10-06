@@ -17,7 +17,7 @@ export function isLivingBoss(monster: BossHealthCandidate): boolean {
 	);
 }
 
-export function normalizedLifeRatio(current: number, max: number): number {
+function normalizedLifeRatio(current: number, max: number): number {
 	if (!Number.isFinite(current) || !Number.isFinite(max) || max <= 0)
 		return 0;
 	return clamp01(current / max);

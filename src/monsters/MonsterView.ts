@@ -28,13 +28,13 @@ const BODY_SHOW_MARGIN = 1.6;
 
 const ATTACK_EXIT_DELAY_S = 0.35;
 
-export const MONSTER_ANIMATION_INTERVAL_S = 1 / 30;
+const MONSTER_ANIMATION_INTERVAL_S = 1 / 30;
 
 const MONSTER_CAMERA_OCCLUSION_HZ = 15;
 const MONSTER_CAMERA_OCCLUSION_INTERVAL_S = 1 / MONSTER_CAMERA_OCCLUSION_HZ;
 const ANIMATION_PHASE_BUCKETS = 8;
 
-export function normalizeAnimationName(name: string): string {
+function normalizeAnimationName(name: string): string {
 	return name.split(/[_:]/).pop()!.toLowerCase();
 }
 
@@ -49,14 +49,14 @@ export function semanticAnimationName(name: string): string {
 	return normalized;
 }
 
-export function animationTransitionDelay(
+function animationTransitionDelay(
 	current: MonsterPresentationAnimation | null,
 	next: MonsterPresentationAnimation,
 ): number {
 	return current === 'attack' && next !== 'attack' ? ATTACK_EXIT_DELAY_S : 0;
 }
 
-export function loopedAnimationFrame(
+function loopedAnimationFrame(
 	from: number,
 	to: number,
 	framesPerSecond: number,

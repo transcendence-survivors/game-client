@@ -99,7 +99,7 @@ function getStaticTerrainGrid(
 	return grid;
 }
 
-export function buildChunkMesh(
+function buildChunkMesh(
 	scene: Scene,
 	world: World,
 	chunkX: number,

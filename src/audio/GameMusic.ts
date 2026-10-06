@@ -1,6 +1,6 @@
 import { MusicPlayer, type MusicTrack } from './MusicPlayer';
 
-export const GAME_MUSIC_TRACKS: readonly MusicTrack[] = [
+const GAME_MUSIC_TRACKS: readonly MusicTrack[] = [
 	{
 		id: 'cursed-crown-run',
 		src: new URL('../assets/music/cursed-crown-run.wav', import.meta.url)

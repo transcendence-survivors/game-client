@@ -17,7 +17,7 @@ const catalogs = { fr, en, de, es, che, it } as const satisfies Record<
 	TranslationCatalog
 >;
 
-export class GameI18n {
+class GameI18n {
 	private locale: GameLocale = DEFAULT_GAME_LOCALE;
 
 	getLocale(): GameLocale {

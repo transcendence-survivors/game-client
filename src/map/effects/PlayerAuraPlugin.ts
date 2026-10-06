@@ -1,7 +1,7 @@
 import * as BABYLON from '@babylonjs/core';
 import { COMBAT_LIMITS, type Vec2d } from '@transcendence/game-shared';
 
-export const MAX_AURAS = COMBAT_LIMITS.maxPlayers;
+const MAX_AURAS = COMBAT_LIMITS.maxPlayers;
 
 export interface AuraInstance extends Vec2d {
 	radius: number;

@@ -4,12 +4,12 @@ import type { CombatEntity } from '@transcendence/game-shared';
 const SNAP_DISTANCE_SQUARED = 36;
 const INTERPOLATION_SPEED = 20;
 
-export function combatInterpolationFactor(deltaTimeS: number): number {
+function combatInterpolationFactor(deltaTimeS: number): number {
 	if (!Number.isFinite(deltaTimeS) || deltaTimeS <= 0) return 0;
 	return Math.min(1, deltaTimeS * INTERPOLATION_SPEED);
 }
 
-export function shouldSnapCombatEntity(distanceSquared: number): boolean {
+function shouldSnapCombatEntity(distanceSquared: number): boolean {
 	return (
 		Number.isFinite(distanceSquared) &&
 		distanceSquared > SNAP_DISTANCE_SQUARED

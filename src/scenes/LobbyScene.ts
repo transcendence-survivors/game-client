@@ -257,7 +257,7 @@ function ensureChannel() {
 	};
 }
 
-export function isDuplicateTab(): Promise<boolean> {
+function isDuplicateTab(): Promise<boolean> {
 	ensureChannel();
 	if (!channel) return Promise.resolve(false);
 

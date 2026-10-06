@@ -7,8 +7,6 @@
 	"types": "./src/index.ts",
 	"scripts": {
 		"typecheck": "tsc --noEmit",
-		"check:animations": "node scripts/optimize-glb-animations.mjs --check",
-		"optimize:animations": "node scripts/optimize-glb-animations.mjs --write",
 		"format": "prettier --write .",
 		"format:check": "prettier --check ."
 	},

@@ -8,7 +8,7 @@ import {
 
 export const EFFECT_RENDER_RATIO = 1;
 
-export interface RadialLightingOptions {
+interface RadialLightingOptions {
 	innerRadius: number;
 	outerRadius: number;
 	penumbra: number;

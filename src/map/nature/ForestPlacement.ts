@@ -18,7 +18,7 @@ import {
 	FOREST_PLACEMENT_STRIDE,
 } from '../world/WorldGenerationProtocol';
 
-export const FOREST_PLACEMENT_KINDS = [
+const FOREST_PLACEMENT_KINDS = [
 	'tree',
 	'rock',
 	'bush',
@@ -175,7 +175,7 @@ const RULE_BY_KIND = Object.fromEntries(
 	RULES.map((rule) => [rule.kind, rule]),
 ) as Readonly<Record<ForestPlacementKind, PlacementRule>>;
 
-export const FOREST_BIOMES = ['meadow', 'forest', 'rocky'] as const;
+const FOREST_BIOMES = ['meadow', 'forest', 'rocky'] as const;
 const FOREST_KIND_INDEX: Readonly<Record<ForestPlacementKind, number>> = {
 	tree: 0,
 	rock: 1,

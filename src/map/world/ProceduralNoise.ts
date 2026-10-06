@@ -7,7 +7,7 @@ export function smoothstep(
 	return t * t * (3 - 2 * t);
 }
 
-export function hash2(x: number, z: number, seed: number): number {
+function hash2(x: number, z: number, seed: number): number {
 	let value =
 		(seed >>> 0) ^
 		Math.imul(x | 0, 0x45d9f3b) ^
@@ -17,7 +17,7 @@ export function hash2(x: number, z: number, seed: number): number {
 	return ((value ^ (value >>> 13)) >>> 0) / 4294967296;
 }
 
-export function valueNoise2d(x: number, z: number, seed: number): number {
+function valueNoise2d(x: number, z: number, seed: number): number {
 	const x0 = Math.floor(x);
 	const z0 = Math.floor(z);
 	const tx = smoothstep(0, 1, x - x0);

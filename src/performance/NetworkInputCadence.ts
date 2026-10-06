@@ -1,7 +1,7 @@
 import { MAX_DT } from '@transcendence/game-shared';
 
-export const NETWORK_MOVE_INTERVAL_S = 1 / 30;
-export const NETWORK_HEARTBEAT_INTERVAL_S = 1 / 5;
+const NETWORK_MOVE_INTERVAL_S = 1 / 30;
+const NETWORK_HEARTBEAT_INTERVAL_S = 1 / 5;
 
 export class NetworkInputCadence {
 	private elapsedS = 0;

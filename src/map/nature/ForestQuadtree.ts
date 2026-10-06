@@ -7,7 +7,7 @@ export interface ForestBounds {
 	readonly maxZ: number;
 }
 
-export interface ForestFrustumPlane {
+interface ForestFrustumPlane {
 	readonly normal: {
 		readonly x: number;
 		readonly y: number;
