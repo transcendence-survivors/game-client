@@ -8,11 +8,6 @@ import {
 	type ForestPlacementBuffer,
 	readForestPlacement,
 } from './ForestPlacement';
-import {
-	ForestQuadtree,
-	type ForestBounds,
-	type ForestDisplayCircle,
-} from './ForestQuadtree';
 import type { WorldGenerationClient } from '../world/WorldGenerationClient';
 import { FOREST_PLACEMENT_CAPACITY } from '../world/WorldGenerationProtocol';
 
@@ -139,7 +134,6 @@ export class ForestRenderer {
 	private readonly generation: WorldGenerationClient;
 	private readonly viewDistance: number;
 	private readonly chunkSize: number;
-	private readonly pageSize: number;
 	private readonly thinRoot: BABYLON.TransformNode;
 	private readonly chunks = new Map<string, LoadedForestChunk>();
 	private readonly pages = new Map<string, ForestRenderPage>();
@@ -147,13 +141,6 @@ export class ForestRenderer {
 	private readonly queue: ChunkCandidate[] = [];
 	private readonly failedModels = new Set<string>();
 	private readonly supportMetadata = new Map<string, SupportMetadata>();
-	private readonly chunkSpatialIndex: ForestQuadtree<LoadedForestChunk>;
-	private readonly visibleChunks = new Set<LoadedForestChunk>();
-	private readonly displayCircle: ForestDisplayCircle = {
-		centerX: 0,
-		centerZ: 0,
-		radius: 0,
-	};
 	private readonly frustumPlanes: BABYLON.Plane[] = Array.from(
 		{ length: 6 },
 		() => new BABYLON.Plane(0, 0, 0, 0),
@@ -225,10 +212,6 @@ export class ForestRenderer {
 		this.thinRoot = new BABYLON.TransformNode('forestThinInstances', scene);
 		this.viewDistance = Math.max(1, Math.floor(viewDistance));
 		this.chunkSize = this.world.N * this.world.CELL;
-		this.pageSize = this.chunkSize * FOREST_PAGE_CHUNK_SPAN;
-		this.chunkSpatialIndex = new ForestQuadtree<LoadedForestChunk>(
-			this.pageSize * 2,
-		);
 	}
 
 	update(position: BABYLON.Vector3): void {
@@ -254,8 +237,6 @@ export class ForestRenderer {
 		this.pending.clear();
 		this.queue.length = 0;
 		this.queueIndex = 0;
-		this.visibleChunks.clear();
-		this.chunkSpatialIndex.clear();
 		this.supportMetadata.clear();
 	}
 
@@ -281,17 +262,26 @@ export class ForestRenderer {
 		return page;
 	}
 
-	private chunkBounds(chunkX: number, chunkZ: number): ForestBounds {
-		const minX = chunkX * this.chunkSize;
-		const minZ = chunkZ * this.chunkSize;
-		return {
-			minX,
-			maxX: (chunkX + 1) * this.chunkSize,
-			minY: FOREST_PAGE_MIN_Y,
-			maxY: FOREST_PAGE_MAX_Y,
-			minZ,
-			maxZ: (chunkZ + 1) * this.chunkSize,
-		};
+	private isChunkInView(
+		chunk: LoadedForestChunk,
+		centerX: number,
+		centerZ: number,
+	): boolean {
+		const minX = chunk.x * this.chunkSize;
+		const minZ = chunk.z * this.chunkSize;
+		const maxX = minX + this.chunkSize;
+		const maxZ = minZ + this.chunkSize;
+		for (const { normal, d } of this.frustumPlanes) {
+			const x = normal.x >= 0 ? maxX : minX;
+			const y = normal.y >= 0 ? FOREST_PAGE_MAX_Y : FOREST_PAGE_MIN_Y;
+			const z = normal.z >= 0 ? maxZ : minZ;
+			if (normal.x * x + normal.y * y + normal.z * z + d < 0)
+				return false;
+		}
+		const dx = Math.max(minX, Math.min(centerX, maxX)) - centerX;
+		const dz = Math.max(minZ, Math.min(centerZ, maxZ)) - centerZ;
+		const radius = this.map.CHUNK_DISPLAY_RADIUS;
+		return dx * dx + dz * dz <= radius * radius;
 	}
 
 	private evictDistantPages(centerX: number, centerZ: number): void {
@@ -320,7 +310,6 @@ export class ForestRenderer {
 				if (chunk.page !== page) continue;
 				chunk.root.dispose();
 				page.chunks.delete(chunk);
-				this.chunkSpatialIndex.remove(chunkKey);
 				this.chunks.delete(chunkKey);
 			}
 			for (const [chunkKey, chunk] of this.pending) {
@@ -511,11 +500,6 @@ export class ForestRenderer {
 				loadedChunk.root.setEnabled(false);
 				this.chunks.set(key, loadedChunk);
 				loadedChunk.page.chunks.add(loadedChunk);
-				this.chunkSpatialIndex.insert(
-					key,
-					this.chunkBounds(loadedChunk.x, loadedChunk.z),
-					loadedChunk,
-				);
 				this.visibilityVersion++;
 				this.visibilityDirty = true;
 			} finally {
@@ -1071,17 +1055,13 @@ export class ForestRenderer {
 			camera.getTransformationMatrix(),
 			this.frustumPlanes,
 		);
-		this.displayCircle.centerX = zoneCenter.x;
-		this.displayCircle.centerZ = zoneCenter.z;
-		this.displayCircle.radius = this.map.CHUNK_DISPLAY_RADIUS;
-		this.chunkSpatialIndex.query(
-			this.frustumPlanes,
-			this.visibleChunks,
-			this.displayCircle,
-		);
 		let chunkVisibilityChanged = false;
 		for (const chunk of this.chunks.values()) {
-			const visible = this.visibleChunks.has(chunk);
+			const visible = this.isChunkInView(
+				chunk,
+				zoneCenter.x,
+				zoneCenter.z,
+			);
 			if (chunk.visible !== visible) {
 				chunk.visible = visible;
 				chunkVisibilityChanged = true;
