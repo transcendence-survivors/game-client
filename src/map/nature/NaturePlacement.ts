@@ -6,11 +6,11 @@ import {
 } from '@transcendence/game-shared';
 import { models } from '../../assets/models';
 import {
-	createGroundPathParameters,
+	fbm2d,
 	groundBiomeWeights,
 	groundPathFactor,
+	smoothstep,
 } from '../world/GroundFeatures';
-import { fbm2d, smoothstep } from '../world/ProceduralNoise';
 
 type NatureKind = keyof typeof models.environment.forest;
 type NatureBiome = 'meadow' | 'forest' | 'rocky';
@@ -145,7 +145,6 @@ function sampleFields(
 	x: number,
 	z: number,
 	surface: WorldSurfaceSample,
-	path: ReturnType<typeof createGroundPathParameters>,
 ): TerrainFields {
 	const gx = Math.floor(x / world.CELL);
 	const gz = Math.floor(z / world.CELL);
@@ -155,7 +154,7 @@ function sampleFields(
 	const slope = clamp01((1 - surface.y) * 4.5);
 	const biome = groundBiomeWeights(x, z, world.seed);
 	return {
-		path: groundPathFactor(x, z, world.seed, path),
+		path: groundPathFactor(x, z, world.seed),
 		grove: clamp01(
 			biome.forest *
 				(1 - smoothstep(0.28, 0.7, slope) * 0.55) *
@@ -186,7 +185,6 @@ export function generateNaturePlacements(
 ): NaturePlacement[] {
 	const chunkSize = world.N * world.CELL;
 	const surface: WorldSurfaceSample = { height: 0, x: 0, y: 1, z: 0 };
-	const path = createGroundPathParameters(world.seed);
 	const placements: NaturePlacement[] = [];
 	const obstacles: { x: number; z: number; radius: number }[] = [];
 
@@ -207,7 +205,7 @@ export function generateNaturePlacements(
 				const roll = random();
 				if (x * x + z * z < START_CLEAR_RADIUS * START_CLEAR_RADIUS)
 					continue;
-				const fields = sampleFields(world, x, z, surface, path);
+				const fields = sampleFields(world, x, z, surface);
 				if (fields.path > rule.maxPath) continue;
 				const patch =
 					0.5 +
