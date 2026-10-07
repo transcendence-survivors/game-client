@@ -1,7 +1,5 @@
 import { World } from '@transcendence/game-shared';
 import {
-	FOREST_PLACEMENT_CAPACITY,
-	FOREST_PLACEMENT_STRIDE,
 	GENERATION_HEADER_BYTES,
 	isSharedGenerationBuffer,
 	TERRAIN_SURFACE_STRIDE,
@@ -9,13 +7,7 @@ import {
 	type GenerationResponse,
 	type GenerationTask,
 } from './WorldGenerationProtocol';
-import {
-	generateForestPlacementsInto,
-} from '../nature/ForestPlacement';
-import {
-	writeTerrainSurface,
-	terrainSurfaceSegments,
-} from './TerrainSurface';
+import { writeTerrainSurface, terrainSurfaceSegments } from './TerrainSurface';
 
 interface WorkerMessageEvent {
 	data: GenerationTask;
@@ -44,31 +36,6 @@ function publish(task: GenerationTask, response: GenerationResponse): void {
 	} else {
 		scope.postMessage(response);
 	}
-}
-
-function generateForest(
-	task: Extract<GenerationTask, { kind: 'forest' }>,
-): void {
-	const world = worldFor(task.seed);
-	const header = new Int32Array(task.buffer, 0, 2);
-	const output = new Float64Array(task.buffer, GENERATION_HEADER_BYTES);
-	if (
-		output.length <
-		FOREST_PLACEMENT_CAPACITY * FOREST_PLACEMENT_STRIDE
-	)
-		throw new Error('Forest placement output buffer is too small');
-	const count = generateForestPlacementsInto(
-		world,
-		task.chunkX,
-		task.chunkZ,
-		output,
-	);
-	writeGenerationReady(
-		header,
-		count,
-		isSharedGenerationBuffer(task.buffer),
-	);
-	publish(task, { id: task.id, kind: task.kind, buffer: task.buffer });
 }
 
 function generateTerrain(
@@ -100,8 +67,7 @@ function generateTerrain(
 scope.onmessage = (event) => {
 	const task = event.data;
 	try {
-		if (task.kind === 'forest') generateForest(task);
-		else generateTerrain(task);
+		generateTerrain(task);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		publish(task, {

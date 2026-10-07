@@ -5,9 +5,6 @@ export const GENERATION_STATUS_INDEX = 0;
 export const GENERATION_COUNT_INDEX = 1;
 export const GENERATION_READY = 1;
 
-export const FOREST_PLACEMENT_STRIDE = 11;
-export const FOREST_PLACEMENT_CAPACITY = 128;
-
 export const TERRAIN_SURFACE_STRIDE = 4;
 
 type GenerationTaskBase = ChunkCoordinates & {
@@ -16,11 +13,7 @@ type GenerationTaskBase = ChunkCoordinates & {
 	buffer: GenerationBuffer;
 };
 
-type ForestGenerationTask = GenerationTaskBase & { kind: 'forest' };
-
-type TerrainGenerationTask = GenerationTaskBase & { kind: 'terrain' };
-
-export type GenerationTask = ForestGenerationTask | TerrainGenerationTask;
+export type GenerationTask = GenerationTaskBase & { kind: 'terrain' };
 
 export interface GenerationResponse {
 	id: number;

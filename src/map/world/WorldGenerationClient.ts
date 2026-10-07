@@ -1,12 +1,5 @@
-import {
-	type ForestPlacementBuffer,
-	generateForestPlacementsInto,
-	validateForestPlacementBuffer,
-} from '../nature/ForestPlacement';
 import type { World } from '@transcendence/game-shared';
 import {
-	FOREST_PLACEMENT_CAPACITY,
-	FOREST_PLACEMENT_STRIDE,
 	GENERATION_HEADER_BYTES,
 	GENERATION_READY,
 	GENERATION_COUNT_INDEX,
@@ -33,11 +26,6 @@ interface PendingTask {
 }
 
 const MAX_POOLED_BUFFERS_PER_SIZE = 2;
-const FOREST_BUFFER_BYTES =
-	GENERATION_HEADER_BYTES +
-	FOREST_PLACEMENT_CAPACITY *
-		FOREST_PLACEMENT_STRIDE *
-		Float64Array.BYTES_PER_ELEMENT;
 
 function supportsSharedBuffers(): boolean {
 	return (
@@ -91,38 +79,6 @@ export class WorldGenerationClient {
 			this.worker.onmessage = this.handleMessage;
 			this.worker.onerror = this.handleWorkerError;
 		}
-	}
-
-	generateForestPacked(
-		world: World,
-		chunkX: number,
-		chunkZ: number,
-	): Promise<ForestPlacementBuffer> {
-		const fallback = (): ForestPlacementBuffer => {
-			const data = new Float64Array(
-				FOREST_PLACEMENT_CAPACITY * FOREST_PLACEMENT_STRIDE,
-			);
-			const count = generateForestPlacementsInto(
-				world,
-				chunkX,
-				chunkZ,
-				data,
-			);
-			return {
-				data,
-				count,
-				release: () => {},
-			};
-		};
-		return this.dispatch(
-			'forest',
-			world.seed,
-			chunkX,
-			chunkZ,
-			FOREST_BUFFER_BYTES,
-			this.decodePackedForest,
-			fallback,
-		);
 	}
 
 	generateTerrain(
@@ -278,21 +234,6 @@ export class WorldGenerationClient {
 		for (const task of tasks)
 			deferToTask(task.fallback).then(task.resolve, task.reject);
 	}
-
-	private readonly decodePackedForest = (
-		buffer: GenerationBuffer,
-	): ForestPlacementBuffer => {
-		const count = readReadyCount(buffer);
-		if (count < 0 || count > FOREST_PLACEMENT_CAPACITY)
-			throw new Error(`Invalid forest placement count: ${count}`);
-		const output = new Float64Array(buffer, GENERATION_HEADER_BYTES);
-		validateForestPlacementBuffer(output, count);
-		return {
-			data: output,
-			count,
-			release: this.createRelease(buffer),
-		};
-	};
 
 	private decodeTerrain = (
 		buffer: GenerationBuffer,
