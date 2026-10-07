@@ -1,5 +1,6 @@
 import {
 	clamp01,
+	mulberry32,
 	TAU,
 	type World,
 	type WorldSurfaceSample,
@@ -130,16 +131,6 @@ function hash(seed: number, x: number, z: number, salt: number): number {
 	return (value ^ (value >>> 15)) >>> 0;
 }
 
-function createRandom(seed: number): () => number {
-	let state = seed >>> 0;
-	return () => {
-		state = (state + 0x6d2b79f5) | 0;
-		let value = Math.imul(state ^ (state >>> 15), 1 | state);
-		value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
-		return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-	};
-}
-
 function sampleFields(
 	world: World,
 	x: number,
@@ -183,13 +174,13 @@ export function generateNaturePlacements(
 	chunkX: number,
 	chunkZ: number,
 ): NaturePlacement[] {
-	const chunkSize = world.N * world.CELL;
+	const chunkSize = world.CHUNK_SIZE;
 	const surface: WorldSurfaceSample = { height: 0, x: 0, y: 1, z: 0 };
 	const placements: NaturePlacement[] = [];
 	const obstacles: { x: number; z: number; radius: number }[] = [];
 
 	RULES.forEach((rule, ruleIndex) => {
-		const random = createRandom(
+		const random = mulberry32(
 			hash(world.seed, chunkX, chunkZ, ruleIndex + 1),
 		);
 		const cells = Math.max(1, Math.round(chunkSize / rule.cell));

@@ -1,25 +1,26 @@
 import * as BABYLON from '@babylonjs/core';
 import type { ModelAssetLibrary } from '../../assets/ModelAssetLibrary';
 import type { MapGenerator } from '../MapGenerator';
-import type { ChunkVisibilityListener } from '../world/ChunkManager';
+import type { ChunkAttachment } from '../world/ChunkManager';
 import {
 	generateNaturePlacements,
 	type NaturePlacement,
 } from './NaturePlacement';
 
 interface NatureChunk {
-	readonly placements: ReadonlyMap<string, readonly NaturePlacement[]>;
+	readonly x: number;
+	readonly z: number;
+	placements: ReadonlyMap<string, readonly NaturePlacement[]> | null;
 	readonly matrices: Map<string, Float32Array>;
-	visible: boolean;
 }
 
 const GROUND_SINK_RATIO = 0.04;
 
-export class NatureRenderer implements ChunkVisibilityListener {
+export class NatureRenderer {
 	private readonly map: MapGenerator;
 	private readonly assets: ModelAssetLibrary;
 	private readonly sources = new Map<string, BABYLON.Mesh[] | null>();
-	private readonly chunks = new Map<string, NatureChunk>();
+	private readonly visibleChunks = new Set<NatureChunk>();
 	private readonly dirtyUrls = new Set<string>();
 	private readonly yaw = new BABYLON.Quaternion();
 	private readonly tilt = new BABYLON.Quaternion();
@@ -32,36 +33,7 @@ export class NatureRenderer implements ChunkVisibilityListener {
 	constructor(map: MapGenerator, assets: ModelAssetLibrary) {
 		this.map = map;
 		this.assets = assets;
-		map.setChunkVisibilityListener(this);
-	}
-
-	onChunkVisibilityChanged(x: number, z: number, visible: boolean): void {
-		const key = `${x},${z}`;
-		let chunk = this.chunks.get(key);
-		if (!chunk) {
-			if (!visible) return;
-			const placements = new Map<string, NaturePlacement[]>();
-			for (const placement of generateNaturePlacements(
-				this.map.getWorld(),
-				x,
-				z,
-			)) {
-				const group = placements.get(placement.url);
-				if (group) group.push(placement);
-				else placements.set(placement.url, [placement]);
-			}
-			chunk = { placements, matrices: new Map(), visible: false };
-			this.chunks.set(key, chunk);
-		}
-		if (chunk.visible === visible) return;
-		chunk.visible = visible;
-		for (const url of chunk.placements.keys()) this.dirtyUrls.add(url);
-	}
-
-	onChunkDisposed(x: number, z: number): void {
-		const key = `${x},${z}`;
-		this.onChunkVisibilityChanged(x, z, false);
-		this.chunks.delete(key);
+		map.setChunkAttachments((x, z) => this.attach(x, z));
 	}
 
 	update(): void {
@@ -77,11 +49,48 @@ export class NatureRenderer implements ChunkVisibilityListener {
 	dispose(): void {
 		if (this.disposed) return;
 		this.disposed = true;
-		this.map.setChunkVisibilityListener(null);
+		this.map.setChunkAttachments(null);
 		for (const source of this.sources.values())
 			for (const mesh of source ?? []) mesh.dispose();
 		this.sources.clear();
-		this.chunks.clear();
+		this.visibleChunks.clear();
+	}
+
+	private attach(x: number, z: number): ChunkAttachment {
+		const chunk: NatureChunk = {
+			x,
+			z,
+			placements: null,
+			matrices: new Map(),
+		};
+		return {
+			setVisible: (visible) => this.setVisible(chunk, visible),
+			dispose: () => this.setVisible(chunk, false),
+		};
+	}
+
+	private setVisible(chunk: NatureChunk, visible: boolean): void {
+		if (visible === this.visibleChunks.has(chunk)) return;
+		if (visible) {
+			chunk.placements ??= this.groupByModel(chunk);
+			this.visibleChunks.add(chunk);
+		} else this.visibleChunks.delete(chunk);
+		for (const url of chunk.placements?.keys() ?? [])
+			this.dirtyUrls.add(url);
+	}
+
+	private groupByModel(chunk: NatureChunk): Map<string, NaturePlacement[]> {
+		const groups = new Map<string, NaturePlacement[]>();
+		for (const placement of generateNaturePlacements(
+			this.map.getWorld(),
+			chunk.x,
+			chunk.z,
+		)) {
+			const group = groups.get(placement.url);
+			if (group) group.push(placement);
+			else groups.set(placement.url, [placement]);
+		}
+		return groups;
 	}
 
 	private loadSource(url: string): void {
@@ -91,9 +100,8 @@ export class NatureRenderer implements ChunkVisibilityListener {
 			.then(({ root }) => {
 				if (this.disposed) return root.dispose();
 				this.sources.set(url, this.prepareSource(root));
-				for (const chunk of this.chunks.values())
-					if (chunk.visible && chunk.placements.has(url))
-						this.dirtyUrls.add(url);
+				for (const chunk of this.visibleChunks)
+					if (chunk.placements?.has(url)) this.dirtyUrls.add(url);
 			})
 			.catch((error: unknown) =>
 				console.warn(`failed to load nature model '${url}'`, error),
@@ -143,9 +151,9 @@ export class NatureRenderer implements ChunkVisibilityListener {
 	private rebuild(url: string, source: readonly BABYLON.Mesh[]): void {
 		const visible: Float32Array[] = [];
 		let length = 0;
-		for (const chunk of this.chunks.values()) {
-			const placements = chunk.placements.get(url);
-			if (!chunk.visible || !placements) continue;
+		for (const chunk of this.visibleChunks) {
+			const placements = chunk.placements?.get(url);
+			if (!placements) continue;
 			let matrices = chunk.matrices.get(url);
 			if (!matrices) {
 				matrices = this.createMatrices(placements);

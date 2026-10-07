@@ -150,12 +150,10 @@ export class GameScene {
 			const seedReady = this.server.connect(seed);
 
 			if (this.disposed) return;
-			const urlParams = new URLSearchParams(window.location.search);
 			this.debugMenu = this.track(
 				new DebugMenu(
 					this.engine,
 					this.scene,
-					!urlParams.has('noDebug'),
 					() =>
 						this.monsters?.getDebugStats() ?? {
 							total: room.state.monsters.size,

@@ -7,7 +7,7 @@ import {
 } from '@transcendence/game-shared';
 import {
 	ChunkManager,
-	type ChunkVisibilityListener,
+	type ChunkAttachmentFactory,
 } from './world/ChunkManager';
 import { SunRayVolumetric } from './effects/SunRayVolumetric';
 import { RadialLightingPostProcess } from './effects/RadialLightingPostProcess';
@@ -138,8 +138,8 @@ export class MapGenerator {
 		return this.rayPos;
 	}
 
-	setChunkVisibilityListener(listener: ChunkVisibilityListener | null) {
-		this.chunkManager.setListener(listener);
+	setChunkAttachments(attach: ChunkAttachmentFactory | null) {
+		this.chunkManager.setAttachments(attach);
 	}
 
 	prepareRenderable(root: BABYLON.TransformNode, includeRoot = true) {

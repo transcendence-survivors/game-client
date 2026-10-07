@@ -39,20 +39,19 @@ export class DebugMenu {
 	private debugStats!: DebugStats;
 	private readonly engine: BABYLON.Engine;
 	private lastUpdateMs = 0;
-	private readonly enabled: boolean;
 	private panel: GUI.Rectangle | null = null;
 	private panelVisible = false;
 	private ui: GUI.AdvancedDynamicTexture | null = null;
-	private readonly instrumentation: BABYLON.SceneInstrumentation | null;
-	private readonly engineInstrumentation: BABYLON.EngineInstrumentation | null;
+	private readonly instrumentation: BABYLON.SceneInstrumentation;
+	private readonly engineInstrumentation: BABYLON.EngineInstrumentation;
 	private readonly cpuFrameHistory = new FrameTimeHistory(
 		FRAME_TIME_WINDOW_MS,
 	);
 	private readonly gpuFrameHistory = new FrameTimeHistory(
 		FRAME_TIME_WINDOW_MS,
 	);
-	private readonly frameStartObserver: BABYLON.Observer<BABYLON.AbstractEngine> | null;
-	private readonly frameEndObserver: BABYLON.Observer<BABYLON.AbstractEngine> | null;
+	private readonly frameStartObserver: BABYLON.Observer<BABYLON.AbstractEngine>;
+	private readonly frameEndObserver: BABYLON.Observer<BABYLON.AbstractEngine>;
 	private readonly gpuTimingSupported: boolean;
 	private frameStartMs: number | null = null;
 	private currentCpuFrameMs: number | null = null;
@@ -61,7 +60,7 @@ export class DebugMenu {
 	private lastGpuCounterCount = 0;
 	private readonly getMonsterStats: () => Readonly<MonsterRendererStats>;
 	private readonly keyDownHandler = (event: KeyboardEvent) => {
-		if (event.code !== 'F3' || event.repeat || !this.enabled) return;
+		if (event.code !== 'F3' || event.repeat) return;
 		event.preventDefault();
 		event.stopPropagation();
 		this.setPanelVisible(!this.panelVisible);
@@ -70,40 +69,25 @@ export class DebugMenu {
 	constructor(
 		engine: BABYLON.Engine,
 		scene: BABYLON.Scene,
-		enabled = true,
 		getMonsterStats: () => Readonly<MonsterRendererStats> = () =>
 			EMPTY_MONSTER_STATS,
 	) {
 		this.engine = engine;
-		this.enabled = enabled;
-		this.gpuTimingSupported =
-			enabled && Boolean(engine.getCaps().timerQuery);
-		this.instrumentation = enabled
-			? new BABYLON.SceneInstrumentation(scene)
-			: null;
-		if (this.instrumentation) {
-			this.instrumentation.captureAnimationsTime = true;
-		}
-		this.engineInstrumentation = enabled
-			? new BABYLON.EngineInstrumentation(engine)
-			: null;
-		if (this.engineInstrumentation && this.gpuTimingSupported) {
+		this.gpuTimingSupported = Boolean(engine.getCaps().timerQuery);
+		this.instrumentation = new BABYLON.SceneInstrumentation(scene);
+		this.instrumentation.captureAnimationsTime = true;
+		this.engineInstrumentation = new BABYLON.EngineInstrumentation(engine);
+		if (this.gpuTimingSupported)
 			this.engineInstrumentation.captureGPUFrameTime = true;
-		}
-		this.frameStartObserver = enabled
-			? engine.onBeginFrameObservable.add(() => {
-					if (this.panelVisible)
-						this.frameStartMs = performance.now();
-				})
-			: null;
-		this.frameEndObserver = enabled
-			? engine.onEndFrameObservable.add(() => this.recordFrameTimes())
-			: null;
+		this.frameStartObserver = engine.onBeginFrameObservable.add(() => {
+			if (this.panelVisible) this.frameStartMs = performance.now();
+		});
+		this.frameEndObserver = engine.onEndFrameObservable.add(() =>
+			this.recordFrameTimes(),
+		);
 		this.getMonsterStats = getMonsterStats;
-		if (enabled) {
-			this.initGUI(scene);
-			window.addEventListener('keydown', this.keyDownHandler);
-		}
+		this.initGUI(scene);
+		window.addEventListener('keydown', this.keyDownHandler);
 	}
 
 	private initGUI(scene: BABYLON.Scene): void {
@@ -231,9 +215,8 @@ export class DebugMenu {
 	private setPanelVisible(visible: boolean): void {
 		this.panelVisible = visible;
 		if (this.panel) this.panel.isVisible = visible;
-		if (this.instrumentation)
-			this.instrumentation.captureAnimationsTime = visible;
-		if (this.engineInstrumentation && this.gpuTimingSupported)
+		this.instrumentation.captureAnimationsTime = visible;
+		if (this.gpuTimingSupported)
 			this.engineInstrumentation.captureGPUFrameTime = visible;
 		if (visible) this.lastUpdateMs = 0;
 		else this.frameStartMs = null;
@@ -243,17 +226,14 @@ export class DebugMenu {
 		window.removeEventListener('keydown', this.keyDownHandler);
 		this.engine.onBeginFrameObservable.remove(this.frameStartObserver);
 		this.engine.onEndFrameObservable.remove(this.frameEndObserver);
-		if (this.engineInstrumentation) {
-			this.engineInstrumentation.captureGPUFrameTime = false;
-			this.engineInstrumentation.dispose();
-		}
-		this.instrumentation?.dispose();
+		this.engineInstrumentation.captureGPUFrameTime = false;
+		this.engineInstrumentation.dispose();
+		this.instrumentation.dispose();
 		this.ui?.dispose();
 	}
 
 	updateDebugMenu(player: BABYLON.AbstractMesh): void {
-		if (!this.enabled || !this.panelVisible || !this.instrumentation)
-			return;
+		if (!this.panelVisible) return;
 		const now = performance.now();
 		if (now - this.lastUpdateMs < DebugMenu.UPDATE_INTERVAL_MS) return;
 		this.lastUpdateMs = now;
@@ -313,15 +293,14 @@ export class DebugMenu {
 	private recordFrameTimes(): void {
 		if (!this.panelVisible) return;
 		const now = performance.now();
-		if (this.instrumentation)
-			this.lastDrawCalls = this.instrumentation.drawCallsCounter.current;
+		this.lastDrawCalls = this.instrumentation.drawCallsCounter.current;
 
 		if (this.frameStartMs !== null) {
 			this.currentCpuFrameMs = Math.max(0, now - this.frameStartMs);
 			this.cpuFrameHistory.add(this.currentCpuFrameMs, now);
 		}
 
-		if (!this.engineInstrumentation || !this.gpuTimingSupported) return;
+		if (!this.gpuTimingSupported) return;
 		const gpuCounter = this.engineInstrumentation.gpuFrameTimeCounter;
 		if (gpuCounter.count <= this.lastGpuCounterCount) return;
 

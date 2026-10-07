@@ -12,7 +12,7 @@ import {
 } from '@transcendence/game-shared';
 import { GROUND_TEXTURE_WORLD_SIZE } from './ProceduralGroundTexture';
 
-const NATURE_VISIBILITY_HEADROOM = new Vector3(0, 16, 0);
+const NATURE_VISIBILITY_HEADROOM = new Vector3(0, 24, 0);
 const gridIndices = new Map<number, Uint16Array>();
 
 function indicesFor(segments: number): Uint16Array {
@@ -44,8 +44,8 @@ export function createTerrainChunk(
 	const segments = world.N * TERRAIN_SUBDIVISIONS_PER_CELL;
 	const row = segments + 1;
 	const spacing = world.CELL / TERRAIN_SUBDIVISIONS_PER_CELL;
-	const originX = chunkX * world.N * world.CELL;
-	const originZ = chunkZ * world.N * world.CELL;
+	const originX = chunkX * world.CHUNK_SIZE;
+	const originZ = chunkZ * world.CHUNK_SIZE;
 	const textureOffset = GROUND_TEXTURE_WORLD_SIZE * 0.5;
 	const positions = new Float32Array(row * row * 3);
 	const normals = new Float32Array(row * row * 3);

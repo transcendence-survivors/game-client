@@ -3,16 +3,19 @@ import type { Mesh, Scene, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { World } from '@transcendence/game-shared';
 import { createTerrainChunk } from './TerrainChunk';
 
-export interface ChunkVisibilityListener {
-	onChunkVisibilityChanged(x: number, z: number, visible: boolean): void;
-	onChunkDisposed(x: number, z: number): void;
+export interface ChunkAttachment {
+	setVisible(visible: boolean): void;
+	dispose(): void;
 }
+
+export type ChunkAttachmentFactory = (x: number, z: number) => ChunkAttachment;
 
 interface LoadedChunk {
 	readonly x: number;
 	readonly z: number;
 	readonly mesh: Mesh;
 	visible: boolean;
+	attachment: ChunkAttachment | null;
 }
 
 const MAX_CHUNKS_CREATED_PER_UPDATE = 2;
@@ -30,7 +33,7 @@ export class ChunkManager {
 		{ length: 6 },
 		() => new Plane(0, 0, 0, 0),
 	);
-	private listener: ChunkVisibilityListener | null = null;
+	private attach: ChunkAttachmentFactory | null = null;
 
 	constructor(
 		scene: Scene,
@@ -49,15 +52,17 @@ export class ChunkManager {
 			.sort(
 				([ax, az], [bx, bz]) => ax * ax + az * az - bx * bx - bz * bz,
 			);
-		this.size = world.N * world.CELL;
+		this.size = world.CHUNK_SIZE;
 		this.displayRadius = displayRadius;
 	}
 
-	setListener(listener: ChunkVisibilityListener | null): void {
-		this.listener = listener;
-		for (const chunk of this.chunks.values())
-			if (chunk.visible)
-				listener?.onChunkVisibilityChanged(chunk.x, chunk.z, true);
+	setAttachments(attach: ChunkAttachmentFactory | null): void {
+		this.attach = attach;
+		for (const chunk of this.chunks.values()) {
+			chunk.attachment?.dispose();
+			chunk.attachment = attach?.(chunk.x, chunk.z) ?? null;
+			if (chunk.visible) chunk.attachment?.setVisible(true);
+		}
 	}
 
 	update(center: Vector3): void {
@@ -83,7 +88,13 @@ export class ChunkManager {
 				this.material,
 			);
 			mesh.setEnabled(false);
-			this.chunks.set(`${x},${z}`, { x, z, mesh, visible: false });
+			this.chunks.set(`${x},${z}`, {
+				x,
+				z,
+				mesh,
+				visible: false,
+				attachment: this.attach?.(x, z) ?? null,
+			});
 			if (++created >= MAX_CHUNKS_CREATED_PER_UPDATE) break;
 		}
 
@@ -100,7 +111,7 @@ export class ChunkManager {
 			if (chunk.visible === visible) continue;
 			chunk.visible = visible;
 			chunk.mesh.setEnabled(visible);
-			this.listener?.onChunkVisibilityChanged(chunk.x, chunk.z, visible);
+			chunk.attachment?.setVisible(visible);
 		}
 	}
 
@@ -111,7 +122,7 @@ export class ChunkManager {
 	private disposeChunk(key: string, chunk: LoadedChunk): void {
 		chunk.mesh.dispose();
 		this.chunks.delete(key);
-		this.listener?.onChunkDisposed(chunk.x, chunk.z);
+		chunk.attachment?.dispose();
 	}
 
 	private intersectsDisplayCircle(
