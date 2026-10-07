@@ -16,7 +16,6 @@ import {
 	type AuraInstance,
 } from './effects/PlayerAuraPlugin';
 import { createProceduralGroundTexture } from './world/ProceduralGroundTexture';
-import { WorldGenerationClient } from './world/WorldGenerationClient';
 
 export class MapGenerator {
 	readonly ZONE_RADIUS = ACCESS_RADIUS;
@@ -24,7 +23,6 @@ export class MapGenerator {
 
 	private readonly scene: Scene;
 	private readonly world: World;
-	private readonly generation: WorldGenerationClient;
 	private terrainMaterial!: BABYLON.StandardMaterial;
 	private terrainTexture!: BABYLON.RawTexture;
 	private terrainLight!: BABYLON.HemisphericLight;
@@ -38,7 +36,6 @@ export class MapGenerator {
 	constructor(scene: Scene, seed: number) {
 		this.scene = scene;
 		this.world = new World(seed);
-		this.generation = new WorldGenerationClient();
 		this.init();
 	}
 
@@ -85,8 +82,6 @@ export class MapGenerator {
 			this.world,
 			this.terrainMaterial,
 			3,
-			performance.now.bind(performance),
-			this.generation,
 			this.CHUNK_DISPLAY_RADIUS,
 		);
 		this.chunkManager.update(BABYLON.Vector3.Zero());
@@ -163,7 +158,6 @@ export class MapGenerator {
 
 	dispose() {
 		this.chunkManager.dispose();
-		this.generation.dispose();
 		this.radialLighting.dispose();
 		this.sunRay.dispose();
 		this.terrainLight.dispose();
