@@ -143,10 +143,6 @@ export class MapGenerator {
 		return this.rayPos;
 	}
 
-	getGenerationClient(): WorldGenerationClient {
-		return this.generation;
-	}
-
 	setChunkVisibilityListener(listener: ChunkVisibilityListener | null) {
 		this.chunkManager.setListener(listener);
 	}
