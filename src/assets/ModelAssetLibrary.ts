@@ -1,56 +1,61 @@
-import type {
-	AbstractMesh,
-	AnimationGroup,
-	AssetContainer,
-	Scene,
+import {
+	LoadAssetContainerAsync,
+	PBRMaterial,
+	StandardMaterial,
+	type AbstractMesh,
+	type AnimationGroup,
+	type AssetContainer,
+	type Scene,
 } from '@babylonjs/core';
-import { AssetContainerCache } from './AssetContainerCache';
-import { getCachedPromise } from './PromiseCache';
 
 export interface ModelInstance {
 	root: AbstractMesh;
 	animationGroups: AnimationGroup[];
 }
 
-interface ModelInstantiationOptions {
-	doNotInstantiate?: boolean;
-}
-
 export class ModelAssetLibrary {
-	private readonly assets: AssetContainerCache;
-	private readonly preparations = new Map<string, Promise<void>>();
+	private readonly scene: Scene;
+	private readonly containers = new Map<string, Promise<AssetContainer>>();
 
-	constructor(scene: Scene, assets = new AssetContainerCache(scene)) {
-		this.assets = assets;
+	constructor(scene: Scene) {
+		this.scene = scene;
 	}
 
-	async instantiate(
-		url: string,
-		name: string,
-		options?: ModelInstantiationOptions,
-	): Promise<ModelInstance> {
-		const container = await this.assets.load(url);
-		const nameFunction = (nodeName: string) => `${name}:${nodeName}`;
-		const instance = options
-			? container.instantiateModelsToScene(nameFunction, false, options)
-			: container.instantiateModelsToScene(nameFunction, false);
+	load(url: string): Promise<AssetContainer> {
+		let container = this.containers.get(url);
+		if (!container) {
+			container = LoadAssetContainerAsync(url, this.scene).then(
+				(loaded) => {
+					for (const material of loaded.materials) {
+						if (material instanceof StandardMaterial)
+							material.disableLighting = true;
+						if (material instanceof PBRMaterial)
+							material.unlit = true;
+					}
+					return loaded;
+				},
+			);
+			this.containers.set(url, container);
+			container.catch(() => this.containers.delete(url));
+		}
+		return container;
+	}
+
+	async instantiate(url: string, name: string): Promise<ModelInstance> {
+		const container = await this.load(url);
+		const instance = container.instantiateModelsToScene(
+			(nodeName) => `${name}:${nodeName}`,
+		);
 		return {
 			root: instance.rootNodes[0] as AbstractMesh,
 			animationGroups: instance.animationGroups,
 		};
 	}
 
-	async prepare(
-		url: string,
-		prepare: (container: AssetContainer) => void,
-	): Promise<void> {
-		await getCachedPromise(this.preparations, url, () =>
-			this.assets.load(url).then(prepare),
-		);
-	}
-
 	dispose(): void {
-		this.preparations.clear();
-		this.assets.dispose();
+		this.containers.forEach((container) =>
+			container.then((loaded) => loaded.dispose()).catch(() => {}),
+		);
+		this.containers.clear();
 	}
 }

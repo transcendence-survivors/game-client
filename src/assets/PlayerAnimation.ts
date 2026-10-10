@@ -1,217 +1,106 @@
-import * as BABYLON from '@babylonjs/core';
+import type { AnimationGroup, Observer } from '@babylonjs/core';
+import type { ModelAssetLibrary } from './ModelAssetLibrary';
+import { applyTransform } from './Transform';
+import { models } from './models';
 
-const WALK_FRAME_RATE = 30;
-const WALK_CYCLE_FRAMES = 30;
-const WALK_SWAY = 0.035;
+type Mode = 'idle' | 'walk' | 'downed' | 'revive';
 
-const PLAYER_CLIP_CANDIDATES = {
-	walk: ['Walk_Loop', 'Walk_Carry_Loop', 'Walk_Formal_Loop'],
-	idle: ['Idle_No_Loop', 'Idle_Rail_Loop'],
-	knockdown: ['Hit_Knockback'],
-	getUp: ['LayToIdle'],
-} as const;
+export class PlayerAnimations {
+	private readonly groups: readonly AnimationGroup[];
+	private readonly walk: AnimationGroup;
+	private readonly idle: AnimationGroup;
+	private readonly knockdown: AnimationGroup;
+	private readonly getUp: AnimationGroup;
+	private current: AnimationGroup | null = null;
+	private onEnd: Observer<AnimationGroup> | null = null;
+	private mode: Mode | null = null;
 
-/** Controls the idle and walk clips for one instantiated player model. */
-export interface PlayerAnimationController {
-	/** Starts the walk clip and keeps it looping. */
-	playWalk(): void;
-	/** Starts the idle clip, if the model provides one. */
-	playIdle(): void;
-	playDowned(): void;
-	playRevive(): void;
-	/** Releases all animation groups owned by the model instance. */
-	dispose(): void;
-}
-
-function clipNameMatches(groupName: string, clipName: string): boolean {
-	return (
-		groupName.slice(groupName.lastIndexOf(':') + 1).toLowerCase() ===
-		clipName.toLowerCase()
-	);
-}
-
-function findPlayerClip<TGroup extends { name: string }>(
-	animationGroups: readonly TGroup[],
-	candidates: readonly string[],
-): TGroup | undefined {
-	for (const candidate of candidates) {
-		const group = animationGroups.find((entry) =>
-			clipNameMatches(entry.name, candidate),
-		);
-		if (group) return group;
-	}
-	return undefined;
-}
-
-function createProceduralWalkAnimation(
-	root: BABYLON.AbstractMesh,
-): BABYLON.AnimationGroup {
-	const group = new BABYLON.AnimationGroup(
-		`${root.name}:proceduralWalk`,
-		root.getScene(),
-	);
-	const sway = new BABYLON.Animation(
-		`${root.name}:walkSway`,
-		'rotation.z',
-		WALK_FRAME_RATE,
-		BABYLON.Animation.ANIMATIONTYPE_FLOAT,
-		BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE,
-	);
-	sway.setKeys([
-		{ frame: 0, value: -WALK_SWAY },
-		{ frame: WALK_CYCLE_FRAMES / 2, value: WALK_SWAY },
-		{ frame: WALK_CYCLE_FRAMES, value: -WALK_SWAY },
-	]);
-	group.addTargetedAnimation(sway, root);
-	return group;
-}
-
-interface PlayerClips {
-	walk: BABYLON.AnimationGroup;
-	idle: BABYLON.AnimationGroup | undefined;
-	knockdown: BABYLON.AnimationGroup | undefined;
-	getUp: BABYLON.AnimationGroup | undefined;
-}
-
-type AnimationMode = 'none' | 'walk' | 'idle' | 'downed' | 'revive';
-
-class PlayerAnimationControllerImpl implements PlayerAnimationController {
-	private current: BABYLON.AnimationGroup | null = null;
-	private pendingEnd: (() => void) | null = null;
-	private mode: AnimationMode = 'none';
-	private readonly clips: PlayerClips;
-	private readonly groups: ReadonlySet<BABYLON.AnimationGroup>;
-
-	constructor(
-		clips: PlayerClips,
-		animationGroups: readonly BABYLON.AnimationGroup[],
-	) {
-		this.clips = clips;
-		this.groups = new Set([...animationGroups, clips.walk]);
+	constructor(groups: readonly AnimationGroup[]) {
+		const clip = (name: string) => {
+			const group = groups.find((entry) =>
+				entry.name.endsWith(`:${name}`),
+			);
+			if (!group)
+				throw new Error(`player animation '${name}' is missing`);
+			return group;
+		};
+		this.groups = groups;
+		this.walk = clip('Walk_Loop');
+		this.idle = clip('Idle_No_Loop');
+		this.knockdown = clip('Hit_Knockback');
+		this.getUp = clip('LayToIdle');
 	}
 
 	playWalk(): void {
-		if (this.isLocked()) return;
-		const walk = this.clips.walk;
-		if (this.mode === 'walk' && walk.isPlaying) return;
-		this.stopCurrent();
-		walk.play(true);
-		this.current = walk;
-		this.mode = 'walk';
+		if (!this.isLocked()) this.play('walk', this.walk, true);
 	}
 
 	playIdle(): void {
-		if (this.isLocked()) return;
-		const idle = this.clips.idle;
-		if (!idle) {
-			if (this.mode !== 'idle') this.stopCurrent();
-			this.mode = 'idle';
-			return;
-		}
-		if (this.mode === 'idle') return;
-		this.stopCurrent();
-		idle.play(false);
-		this.current = idle;
-		this.mode = 'idle';
+		if (!this.isLocked()) this.play('idle', this.idle, false);
 	}
 
 	playDowned(): void {
-		if (this.mode === 'downed') return;
-		this.stopCurrent();
-		this.mode = 'downed';
-		const knockdown = this.clips.knockdown;
-		if (!knockdown) {
-			this.holdFallenPose();
-			return;
-		}
-		knockdown.play(false);
-		this.current = knockdown;
-		this.onceEnded(knockdown, () => this.holdFallenPose());
+		this.play('downed', this.knockdown, false, () => {
+			this.stop();
+			this.getUp.play(false);
+			this.getUp.pause();
+			this.getUp.goToFrame(this.getUp.from);
+			this.current = this.getUp;
+		});
 	}
 
 	playRevive(): void {
-		if (this.mode === 'revive') return;
-		const getUp = this.clips.getUp;
-		if (!getUp) {
-			this.mode = 'none';
-			this.playIdle();
-			return;
-		}
-		this.stopCurrent();
-		this.mode = 'revive';
-		getUp.play(false);
-		this.current = getUp;
-		this.onceEnded(getUp, () => {
-			this.mode = 'none';
+		this.play('revive', this.getUp, false, () => {
+			this.mode = null;
 			this.playIdle();
 		});
 	}
 
 	dispose(): void {
-		this.mode = 'none';
-		this.stopCurrent();
+		this.stop();
 		this.groups.forEach((group) => group.dispose());
 	}
 
-	private onceEnded(
-		group: BABYLON.AnimationGroup,
-		next: () => void,
+	private play(
+		mode: Mode,
+		group: AnimationGroup,
+		loop: boolean,
+		then?: () => void,
 	): void {
-		const observer = group.onAnimationGroupEndObservable.addOnce(() => {
-			this.pendingEnd = null;
-			next();
-		});
-		this.pendingEnd = () => {
-			group.onAnimationGroupEndObservable.remove(observer);
-			this.pendingEnd = null;
-		};
+		if (this.mode === mode) return;
+		this.stop();
+		this.mode = mode;
+		this.current = group;
+		group.play(loop);
+		if (then)
+			this.onEnd = group.onAnimationGroupEndObservable.addOnce(() => {
+				this.onEnd = null;
+				then();
+			});
+	}
+
+	private stop(): void {
+		this.current?.onAnimationGroupEndObservable.remove(this.onEnd);
+		this.onEnd = null;
+		this.current?.stop();
+		this.current = null;
 	}
 
 	private isLocked(): boolean {
 		return this.mode === 'downed' || this.mode === 'revive';
 	}
-
-	private holdFallenPose(): void {
-		const getUp = this.clips.getUp;
-		if (!getUp) {
-			this.current = null;
-			return;
-		}
-		this.stopCurrent();
-		getUp.play(false);
-		getUp.pause();
-		getUp.goToFrame(getUp.from);
-		this.current = getUp;
-	}
-
-	private stopCurrent(): void {
-		this.pendingEnd?.();
-		this.current?.stop();
-		this.current = null;
-	}
 }
 
-/**
- * Selects the library's real walk and idle clips, with a procedural fallback
- * for older or minimal player assets that do not contain those clips.
- */
-export function createPlayerAnimationController(
-	root: BABYLON.AbstractMesh,
-	animationGroups: readonly BABYLON.AnimationGroup[],
-): PlayerAnimationController {
-	const walk =
-		findPlayerClip(animationGroups, PLAYER_CLIP_CANDIDATES.walk) ??
-		animationGroups.find((group) => /walk/i.test(group.name)) ??
-		animationGroups[0] ??
-		createProceduralWalkAnimation(root);
-	const clips: PlayerClips = {
-		walk,
-		idle: findPlayerClip(animationGroups, PLAYER_CLIP_CANDIDATES.idle),
-		knockdown: findPlayerClip(
-			animationGroups,
-			PLAYER_CLIP_CANDIDATES.knockdown,
-		),
-		getUp: findPlayerClip(animationGroups, PLAYER_CLIP_CANDIDATES.getUp),
-	};
-	return new PlayerAnimationControllerImpl(clips, animationGroups);
+export async function createPlayerModel(
+	assets: ModelAssetLibrary,
+	name: string,
+) {
+	const { root, animationGroups } = await assets.instantiate(
+		models.player,
+		name,
+	);
+	applyTransform(root);
+	const animations = new PlayerAnimations(animationGroups);
+	animations.playIdle();
+	return { root, animations };
 }

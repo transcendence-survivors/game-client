@@ -1,8 +1,4 @@
-interface DisposableView {
-	dispose(): void;
-}
-
-export class AsyncViewRegistry<TView extends DisposableView> {
+export class AsyncViewRegistry<TView extends { dispose(): void }> {
 	private readonly views = new Map<string, TView>();
 	private readonly pending = new Map<string, object>();
 	private disposed = false;
@@ -18,10 +14,8 @@ export class AsyncViewRegistry<TView extends DisposableView> {
 			if (this.pending.get(id) === token) this.pending.delete(id);
 			throw error;
 		}
-		if (this.disposed || this.pending.get(id) !== token) {
-			view.dispose();
-			return;
-		}
+		if (this.disposed || this.pending.get(id) !== token)
+			return view.dispose();
 		this.pending.delete(id);
 		this.views.get(id)?.dispose();
 		this.views.set(id, view);
