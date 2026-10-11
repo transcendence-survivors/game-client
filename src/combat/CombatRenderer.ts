@@ -1,82 +1,211 @@
 import * as BABYLON from '@babylonjs/core';
+import '@babylonjs/loaders/glTF';
 import * as COLYSEUS from '@colyseus/sdk';
-import type { CombatEntity, GameState } from '@transcendence/game-shared';
-import { CombatAssetLibrary } from './CombatAssetLibrary';
-import type { CombatEntityView } from './CombatEntityView';
-import { CombatViewFactory } from './CombatViewFactory';
-import { AsyncViewRegistry } from './AsyncViewRegistry';
-import type { WeaponAttachmentRenderer } from './WeaponAttachmentRenderer';
+import {
+	WEAPON_KINDS,
+	type CombatEntity,
+	type GameState,
+	type WeaponKind,
+} from '@transcendence/game-shared';
+import type { ModelAssetLibrary } from '../assets/ModelAssetLibrary';
+import { applyTransform, type Transform } from '../assets/Transform';
 import { CleanupBag } from '../CleanupBag';
+import { AsyncViewRegistry } from '../AsyncViewRegistry';
+import { smoothingFactor, smoothTowards } from '../ServerSmoothing';
+import {
+	WEAPON_VISUALS,
+	type AttackAnimationConfig,
+	type ProjectileVisual,
+} from './WeaponVisuals';
+
+const PROJECTILE_SMOOTHING_SPEED = 20;
+
+interface ProjectileView {
+	entity: CombatEntity;
+	motionNode: BABYLON.TransformNode;
+	spinSpeed: number;
+	dispose(): void;
+}
+
+const heldWeaponKey = (playerId: string, weapon: WeaponKind) =>
+	`${playerId}:${weapon}`;
 
 export class CombatRenderer {
-	private readonly factory: CombatViewFactory;
-	private readonly views = new AsyncViewRegistry<CombatEntityView>();
-	private readonly observer: BABYLON.Observer<BABYLON.Scene>;
 	private readonly scene: BABYLON.Scene;
-	private readonly room: COLYSEUS.Room<GameState>;
-	private readonly weaponAttachments: WeaponAttachmentRenderer;
+	private readonly modelLibrary: ModelAssetLibrary;
+	private readonly projectileViews = new AsyncViewRegistry<ProjectileView>();
+	private readonly heldWeapons =
+		new AsyncViewRegistry<BABYLON.TransformNode>();
 	private readonly subscriptions = new CleanupBag();
 
 	constructor(
 		scene: BABYLON.Scene,
 		room: COLYSEUS.Room<GameState>,
-		assets: CombatAssetLibrary,
-		weaponAttachments: WeaponAttachmentRenderer,
+		modelLibrary: ModelAssetLibrary,
 	) {
 		this.scene = scene;
-		this.room = room;
-		this.weaponAttachments = weaponAttachments;
-		this.factory = new CombatViewFactory(scene, assets);
-		this.observer = scene.onBeforeRenderObservable.add(() => this.update());
+		this.modelLibrary = modelLibrary;
+		const observer = scene.onBeforeRenderObservable.add(() =>
+			this.updateProjectileViews(),
+		);
+		const callbacks = COLYSEUS.Callbacks.get(room);
+		this.subscriptions.add(
+			() => scene.onBeforeRenderObservable.remove(observer),
+			callbacks.onAdd('combatEntities', (entity, id) =>
+				this.onCombatEntityAdded(entity, id),
+			),
+			callbacks.onRemove('combatEntities', (_entity, id) =>
+				this.projectileViews.remove(id),
+			),
+		);
 	}
 
-	listen(): void {
-		const callbacks = COLYSEUS.Callbacks.get(this.room);
-		this.subscriptions.add(
-			callbacks.onAdd(
-				'combatEntities',
-				(entity, id) => void this.add(entity, id),
-			),
-		);
-		this.subscriptions.add(
-			callbacks.onRemove('combatEntities', (_entity, id) =>
-				this.remove(id),
-			),
-		);
+	removePlayer(playerId: string): void {
+		for (const weapon of WEAPON_KINDS)
+			this.heldWeapons.remove(heldWeaponKey(playerId, weapon));
+	}
+
+	attachHeldWeapon(
+		playerId: string,
+		playerMesh: BABYLON.AbstractMesh,
+		weapon: WeaponKind,
+	): void {
+		const heldVisual = WEAPON_VISUALS[weapon].held;
+		if (!heldVisual) return;
+		this.heldWeapons
+			.add(heldWeaponKey(playerId, weapon), async () => {
+				const model = await this.loadWeaponModel(
+					heldVisual.url,
+					`${weapon}:${playerId}`,
+				);
+				const motionNode = this.insertMotionNode(
+					model,
+					heldVisual.modelCorrection,
+					playerMesh,
+				);
+				applyTransform(motionNode, heldVisual.handPlacement);
+				return motionNode;
+			})
+			.catch((error) => console.error(`weapon '${weapon}'`, error));
 	}
 
 	dispose(): void {
 		this.subscriptions.dispose();
-		this.scene.onBeforeRenderObservable.remove(this.observer);
-		this.views.dispose();
-		this.factory.dispose();
+		this.projectileViews.dispose();
+		this.heldWeapons.dispose();
 	}
 
-	private async add(entity: CombatEntity, id: string): Promise<void> {
-		try {
-			this.weaponAttachments.playAttack(
-				entity.ownerSessionId,
-				entity.weaponKind,
+	private onCombatEntityAdded(entity: CombatEntity, id: string): void {
+		this.playAttackAnimation(entity.ownerSessionId, entity.weaponKind);
+		const projectileVisual = WEAPON_VISUALS[entity.weaponKind].projectile;
+		if (!projectileVisual) return;
+		this.projectileViews
+			.add(id, () =>
+				this.createProjectileView(entity, id, projectileVisual),
+			)
+			.catch((error) =>
+				console.error(`projectile '${entity.kind}'`, error),
 			);
-			await this.views.add(id, () => this.factory.create(entity, id));
-		} catch (error) {
-			console.error(
-				`failed to render combat entity '${entity.kind}'`,
-				error,
-			);
-		}
 	}
 
-	private remove(id: string): void {
-		this.views.remove(id);
+	private playAttackAnimation(playerId: string, weapon: WeaponKind): void {
+		const heldVisual = WEAPON_VISUALS[weapon].held;
+		const motionNode = this.heldWeapons.get(
+			heldWeaponKey(playerId, weapon),
+		);
+		if (!heldVisual || !motionNode) return;
+		const config = heldVisual.attackAnimation;
+		this.scene.stopAnimation(motionNode);
+		this.scene.beginDirectAnimation(
+			motionNode,
+			[this.createAttackAnimation(weapon, config)],
+			0,
+			config.frames[config.frames.length - 1],
+			false,
+			1,
+			() => (motionNode[config.property][config.axis] = config.values[0]),
+		);
 	}
 
-	private update(): void {
-		const deltaTimeS = this.scene.getEngine().getDeltaTime() / 1000;
-		this.views.forEach((view, id) => {
-			const entity = this.room.state.combatEntities.get(id);
-			if (!entity) return;
-			view.update(deltaTimeS, this.room.state.combatTimeS);
+	private createAttackAnimation(
+		weapon: WeaponKind,
+		config: AttackAnimationConfig,
+	): BABYLON.Animation {
+		const animation = new BABYLON.Animation(
+			`${weapon}Attack`,
+			`${config.property}.${config.axis}`,
+			60,
+			BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+			BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT,
+		);
+		animation.setKeys(
+			config.frames.map((frame, i) => ({
+				frame,
+				value: config.values[i],
+			})),
+		);
+		const easing = new BABYLON.QuadraticEase();
+		easing.setEasingMode(config.easing);
+		animation.setEasingFunction(easing);
+		return animation;
+	}
+
+	private async createProjectileView(
+		entity: CombatEntity,
+		id: string,
+		visual: ProjectileVisual,
+	): Promise<ProjectileView> {
+		const model = await this.loadWeaponModel(
+			visual.url,
+			`${entity.kind}:${id}`,
+		);
+		const motionNode = this.insertMotionNode(
+			model,
+			visual.modelCorrection,
+			null,
+		);
+		motionNode.position.set(entity.x, entity.y, entity.z);
+		motionNode.rotation.y = entity.rotationY;
+		motionNode.scaling.setAll(entity.scale);
+		return {
+			entity,
+			motionNode,
+			spinSpeed: visual.spinSpeed,
+			dispose: () => motionNode.dispose(),
+		};
+	}
+
+	private updateProjectileViews(): void {
+		const deltaS = this.scene.getEngine().getDeltaTime() / 1000;
+		const factor = smoothingFactor(PROJECTILE_SMOOTHING_SPEED, deltaS);
+		this.projectileViews.forEach(({ entity, motionNode, spinSpeed }) => {
+			const { x, y, z } = entity;
+			smoothTowards(motionNode.position, x, y, z, factor);
+			motionNode.rotation.y += deltaS * spinSpeed;
 		});
+	}
+
+	private insertMotionNode(
+		model: BABYLON.TransformNode,
+		modelCorrection: Transform,
+		parent: BABYLON.Node | null,
+	): BABYLON.TransformNode {
+		const motionNode = new BABYLON.TransformNode(
+			`${model.name}:motion`,
+			this.scene,
+		);
+		motionNode.parent = parent;
+		model.parent = motionNode;
+		applyTransform(model, modelCorrection);
+		return motionNode;
+	}
+
+	private async loadWeaponModel(
+		url: string,
+		name: string,
+	): Promise<BABYLON.TransformNode> {
+		const { root } = await this.modelLibrary.instantiate(url, name);
+		root.getChildMeshes().forEach((mesh) => (mesh.isPickable = false));
+		return root;
 	}
 }
