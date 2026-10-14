@@ -1,109 +1,95 @@
 import * as BABYLON from '@babylonjs/core';
 import * as GUI from '@babylonjs/gui';
+import type { MonsterDamageEvent } from '@transcendence/game-shared';
+import { createFullscreenUi } from '../assets/ui';
 
+const LABEL_ABOVE_HEAD = 1.5;
+const FONT_SIZE = 22;
+const COLOR = '#ffe14d';
+const FATAL_COLOR = '#ff5a3c';
 const LIFETIME_S = 0.9;
 const RISE_PX = 58;
 const START_OFFSET_PX = -8;
 const JITTER_PX = 26;
-const FONT_SIZE = 22;
-const ELITE_FONT_SIZE = 26;
-const BOSS_FONT_SIZE = 32;
-const COLOR = '#ffe14d';
-const FATAL_COLOR = '#ff5a3c';
-const ELITE_COLOR = '#f6c445';
-const MAX_VISIBLE_FLOATERS = 72;
+const MAX_VISIBLE_LABELS = 72;
 
-interface Floater {
+interface DamageLabel {
 	text: GUI.TextBlock;
 	anchor: BABYLON.TransformNode;
-	elapsed: number;
+	elapsedS: number;
 }
 
 export class DamageNumbers {
 	private readonly scene: BABYLON.Scene;
 	private readonly ui: GUI.AdvancedDynamicTexture;
-	private readonly floaters: Floater[] = [];
-	private readonly pool: Floater[] = [];
+	private readonly activeLabels: DamageLabel[] = [];
+	private readonly labelPool: DamageLabel[] = [];
 
-	constructor(scene: BABYLON.Scene, ui: GUI.AdvancedDynamicTexture) {
+	constructor(scene: BABYLON.Scene) {
 		this.scene = scene;
-		this.ui = ui;
+		this.ui = createFullscreenUi('monsterOverlay', scene);
 	}
 
-	spawn(
-		position: BABYLON.Vector3,
-		amount: number,
-		isBoss: boolean,
-		fatal: boolean,
-		isElite = false,
-	): void {
-		const rounded = Math.round(amount);
-		if (rounded <= 0) return;
-		if (
-			this.floaters.length >= MAX_VISIBLE_FLOATERS &&
-			!fatal &&
-			!isBoss &&
-			!isElite
-		)
-			return;
-
-		const floater = this.pool.pop() ?? this.createFloater();
-		const { anchor, text } = floater;
-		anchor.position.copyFrom(position);
-		floater.elapsed = 0;
-		text.text = `-${rounded}`;
-		text.color = fatal ? FATAL_COLOR : isElite ? ELITE_COLOR : COLOR;
-		text.fontSize = isBoss
-			? BOSS_FONT_SIZE
-			: isElite
-				? ELITE_FONT_SIZE
-				: FONT_SIZE;
-		text.linkOffsetX = (Math.random() - 0.5) * JITTER_PX;
-		text.linkOffsetY = START_OFFSET_PX;
-		text.alpha = 1;
-		text.isVisible = true;
-
-		this.floaters.push(floater);
+	spawn(event: MonsterDamageEvent, headHeight: number): void {
+		const roundedAmount = Math.round(event.amount);
+		const isFull = this.activeLabels.length >= MAX_VISIBLE_LABELS;
+		if (roundedAmount <= 0 || (isFull && !event.fatal)) return;
+		const label = this.labelPool.pop() ?? this.createLabel();
+		label.anchor.position.set(
+			event.x,
+			event.y + headHeight + LABEL_ABOVE_HEAD,
+			event.z,
+		);
+		label.elapsedS = 0;
+		Object.assign(label.text, {
+			text: `-${roundedAmount}`,
+			color: event.fatal ? FATAL_COLOR : COLOR,
+			fontSize: FONT_SIZE,
+			linkOffsetX: (Math.random() - 0.5) * JITTER_PX,
+			linkOffsetY: START_OFFSET_PX,
+			alpha: 1,
+			isVisible: true,
+		});
+		this.activeLabels.push(label);
 	}
 
 	update(deltaTime: number): void {
-		for (let i = this.floaters.length - 1; i >= 0; i--) {
-			const floater = this.floaters[i];
-			floater.elapsed += deltaTime;
-			const t = floater.elapsed / LIFETIME_S;
-			if (t >= 1) {
-				floater.text.isVisible = false;
-				const last = this.floaters.pop()!;
-				if (i < this.floaters.length) this.floaters[i] = last;
-				this.pool.push(floater);
+		for (let i = this.activeLabels.length - 1; i >= 0; i--) {
+			const label = this.activeLabels[i];
+			label.elapsedS += deltaTime;
+			const progress = label.elapsedS / LIFETIME_S;
+			if (progress >= 1) {
+				label.text.isVisible = false;
+				this.activeLabels[i] =
+					this.activeLabels[this.activeLabels.length - 1];
+				this.activeLabels.pop();
+				this.labelPool.push(label);
 				continue;
 			}
-			floater.text.linkOffsetY = START_OFFSET_PX - RISE_PX * t;
-			floater.text.alpha = t < 0.5 ? 1 : 1 - (t - 0.5) / 0.5;
+			label.text.linkOffsetY = START_OFFSET_PX - RISE_PX * progress;
+			label.text.alpha = progress < 0.5 ? 1 : 2 - 2 * progress;
 		}
 	}
 
 	dispose(): void {
-		for (const floater of this.floaters) this.disposeFloater(floater);
-		for (const floater of this.pool) this.disposeFloater(floater);
-		this.floaters.length = 0;
-		this.pool.length = 0;
+		for (const label of [...this.activeLabels, ...this.labelPool])
+			label.anchor.dispose();
+		this.ui.dispose();
 	}
 
-	private createFloater(): Floater {
-		const anchor = new BABYLON.TransformNode('dmgAnchor', this.scene);
-		const text = new GUI.TextBlock('dmg');
-		text.fontWeight = 'bold';
-		text.outlineColor = 'black';
-		text.outlineWidth = 4;
-		text.resizeToFit = true;
+	private createLabel(): DamageLabel {
+		const anchor = new BABYLON.TransformNode(
+			'damageLabelAnchor',
+			this.scene,
+		);
+		const text = Object.assign(new GUI.TextBlock('damageLabel'), {
+			fontWeight: 'bold',
+			outlineColor: 'black',
+			outlineWidth: 4,
+			resizeToFit: true,
+		});
 		this.ui.addControl(text);
 		text.linkWithMesh(anchor);
-		return { text, anchor, elapsed: 0 };
-	}
-
-	private disposeFloater(floater: Floater): void {
-		floater.text.dispose();
-		floater.anchor.dispose();
+		return { text, anchor, elapsedS: 0 };
 	}
 }
