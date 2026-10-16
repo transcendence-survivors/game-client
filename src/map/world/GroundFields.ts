@@ -1,42 +1,9 @@
-import { makeNoise2D, TAU, type Noise2D } from '@transcendence/game-shared';
+import { TAU } from '@transcendence/game-shared';
+import { fbm2d, smoothstep } from './NoiseMath';
 
-export interface GroundBiomeWeights {
-	meadow: number;
-	forest: number;
-	rocky: number;
-}
-
-const noises = new Map<number, Noise2D>();
-
-export function smoothstep(
-	edge0: number,
-	edge1: number,
-	value: number,
-): number {
-	const t = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)));
-	return t * t * (3 - 2 * t);
-}
-
-export function fbm2d(x: number, z: number, seed: number): number {
-	const key = seed >>> 0;
-	let noise = noises.get(key);
-	if (!noise) {
-		if (noises.size > 64) noises.clear();
-		noise = makeNoise2D(key);
-		noises.set(key, noise);
-	}
-	let value = 0;
-	let amplitude = 0.5;
-	let frequency = 1;
-	for (let octave = 0; octave < 4; octave++) {
-		value +=
-			noise(x * frequency + octave * 17.3, z * frequency - octave * 9.1) *
-			amplitude;
-		amplitude *= 0.5;
-		frequency *= 2;
-	}
-	return value / 0.9375;
-}
+export const BIOMES = ['meadow', 'forest', 'rocky'] as const;
+export type Biome = (typeof BIOMES)[number];
+export type GroundBiomeWeights = Record<Biome, number>;
 
 export function groundBiomeWeights(
 	x: number,
@@ -73,6 +40,15 @@ export function groundBiomeWeights(
 	};
 }
 
+export function dominantBiome({
+	meadow,
+	forest,
+	rocky,
+}: GroundBiomeWeights): Biome {
+	if (rocky >= meadow && rocky >= forest) return 'rocky';
+	return forest >= meadow ? 'forest' : 'meadow';
+}
+
 function pathBand(distance: number, inner: number, outer: number): number {
 	return 1 - smoothstep(inner, outer, Math.abs(distance));
 }
@@ -83,10 +59,5 @@ export function groundPathFactor(x: number, z: number, seed: number): number {
 		0.12 * x +
 		13 * (Math.sin(x * 0.028 + phase) - Math.sin(phase)) +
 		5 * (Math.sin(x * 0.075 - phase * 0.5) - Math.sin(-phase * 0.5));
-	const branchLine =
-		-72 + 0.12 * z + 14 * (Math.sin(z * 0.035 + phase) - Math.sin(phase));
-	return Math.max(
-		pathBand(z - centerLine, 4.5, 10.5),
-		pathBand(x - branchLine, 3.5, 8.5) * 0.88,
-	);
+	return pathBand(z - centerLine, 4.5, 10.5);
 }

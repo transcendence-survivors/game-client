@@ -5,7 +5,7 @@
  * the procedural stream varied without making every nearby chunk load dozens
  * of large duplicate texture payloads.
  */
-export const forestModels = {
+export const natureModels = {
 	tree: [
 		new URL('./stylized-nature/CommonTree_1.glb', import.meta.url).href,
 		new URL('./stylized-nature/CommonTree_3.glb', import.meta.url).href,
@@ -30,8 +30,7 @@ export const forestModels = {
 			.href,
 		new URL('./stylized-nature/Grass_Wispy_Short.glb', import.meta.url)
 			.href,
-		new URL('./stylized-nature/Grass_Wispy_Tall.glb', import.meta.url)
-			.href,
+		new URL('./stylized-nature/Grass_Wispy_Tall.glb', import.meta.url).href,
 	],
 	flower: [
 		new URL('./stylized-nature/Fern_1.glb', import.meta.url).href,

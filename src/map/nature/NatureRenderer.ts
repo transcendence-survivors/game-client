@@ -1,6 +1,6 @@
 import * as BABYLON from '@babylonjs/core';
+import type { World } from '@transcendence/game-shared';
 import type { ModelAssetLibrary } from '../../assets/ModelAssetLibrary';
-import type { MapGenerator } from '../MapGenerator';
 import type { ChunkAttachment } from '../world/ChunkManager';
 import {
 	generateNaturePlacements,
@@ -8,16 +8,12 @@ import {
 } from './NaturePlacement';
 
 interface NatureChunk {
-	readonly x: number;
-	readonly z: number;
 	placements: ReadonlyMap<string, readonly NaturePlacement[]> | null;
 	readonly matrices: Map<string, Float32Array>;
 }
 
-const GROUND_SINK_RATIO = 0.04;
-
 export class NatureRenderer {
-	private readonly map: MapGenerator;
+	private readonly world: World;
 	private readonly assets: ModelAssetLibrary;
 	private readonly sources = new Map<string, BABYLON.Mesh[] | null>();
 	private readonly visibleChunks = new Set<NatureChunk>();
@@ -30,10 +26,9 @@ export class NatureRenderer {
 	private readonly matrix = new BABYLON.Matrix();
 	private disposed = false;
 
-	constructor(map: MapGenerator, assets: ModelAssetLibrary) {
-		this.map = map;
+	constructor(world: World, assets: ModelAssetLibrary) {
+		this.world = world;
 		this.assets = assets;
-		map.setChunkAttachments((x, z) => this.attach(x, z));
 	}
 
 	update(): void {
@@ -47,45 +42,35 @@ export class NatureRenderer {
 	}
 
 	dispose(): void {
-		if (this.disposed) return;
 		this.disposed = true;
-		this.map.setChunkAttachments(null);
 		for (const source of this.sources.values())
 			for (const mesh of source ?? []) mesh.dispose();
 		this.sources.clear();
 		this.visibleChunks.clear();
 	}
 
-	private attach(x: number, z: number): ChunkAttachment {
-		const chunk: NatureChunk = {
-			x,
-			z,
-			placements: null,
-			matrices: new Map(),
-		};
+	createChunkAttachment(x: number, z: number): ChunkAttachment {
+		const chunk: NatureChunk = { placements: null, matrices: new Map() };
 		return {
-			setVisible: (visible) => this.setVisible(chunk, visible),
+			setVisible: (visible) => {
+				if (visible) chunk.placements ??= this.groupByModel(x, z);
+				this.setVisible(chunk, visible);
+			},
 			dispose: () => this.setVisible(chunk, false),
 		};
 	}
 
 	private setVisible(chunk: NatureChunk, visible: boolean): void {
 		if (visible === this.visibleChunks.has(chunk)) return;
-		if (visible) {
-			chunk.placements ??= this.groupByModel(chunk);
-			this.visibleChunks.add(chunk);
-		} else this.visibleChunks.delete(chunk);
+		if (visible) this.visibleChunks.add(chunk);
+		else this.visibleChunks.delete(chunk);
 		for (const url of chunk.placements?.keys() ?? [])
 			this.dirtyUrls.add(url);
 	}
 
-	private groupByModel(chunk: NatureChunk): Map<string, NaturePlacement[]> {
+	private groupByModel(x: number, z: number): Map<string, NaturePlacement[]> {
 		const groups = new Map<string, NaturePlacement[]>();
-		for (const placement of generateNaturePlacements(
-			this.map.getWorld(),
-			chunk.x,
-			chunk.z,
-		)) {
+		for (const placement of generateNaturePlacements(this.world, x, z)) {
 			const group = groups.get(placement.url);
 			if (group) group.push(placement);
 			else groups.set(placement.url, [placement]);
@@ -109,42 +94,20 @@ export class NatureRenderer {
 	}
 
 	private prepareSource(root: BABYLON.AbstractMesh): BABYLON.Mesh[] {
-		root.rotationQuaternion = null;
-		root.rotation.setAll(0);
-		root.position.setAll(0);
-		root.scaling.setAll(1);
-		this.map.prepareRenderable(root, true);
-		const meshes = [root, ...root.getChildMeshes()].filter(
-			(mesh): mesh is BABYLON.Mesh =>
-				mesh instanceof BABYLON.Mesh &&
-				mesh.getTotalVertices() > 0 &&
-				!mesh.skeleton &&
-				!mesh.morphTargetManager,
-		);
-		const { min, max } = root.getHierarchyBoundingVectors(true);
-		const ground = BABYLON.Matrix.Translation(
-			0,
-			-min.y - (max.y - min.y) * GROUND_SINK_RATIO,
-			0,
-		);
-		const transforms = meshes.map((mesh) =>
-			mesh.computeWorldMatrix(true).multiply(ground),
-		);
-		meshes.forEach((mesh, index) => {
+		const meshes = root
+			.getChildMeshes()
+			.filter(
+				(mesh): mesh is BABYLON.Mesh =>
+					mesh instanceof BABYLON.Mesh && mesh.getTotalVertices() > 0,
+			);
+		for (const mesh of meshes) {
 			mesh.parent = null;
-			mesh.makeGeometryUnique();
-			mesh.bakeTransformIntoVertices(transforms[index]!);
-			mesh.rotationQuaternion = null;
-			mesh.rotation.setAll(0);
-			mesh.position.setAll(0);
-			mesh.scaling.setAll(1);
 			mesh.isPickable = false;
 			mesh.alwaysSelectAsActiveMesh = true;
-			mesh.thinInstanceEnablePicking = false;
 			mesh.setEnabled(false);
 			mesh.freezeWorldMatrix();
-		});
-		if (!meshes.includes(root as BABYLON.Mesh)) root.dispose();
+		}
+		root.dispose();
 		return meshes;
 	}
 
