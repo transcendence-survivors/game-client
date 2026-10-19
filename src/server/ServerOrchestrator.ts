@@ -1,7 +1,6 @@
 import * as BABYLON from '@babylonjs/core';
 import * as COLYSEUS from '@colyseus/sdk';
-import { MapGenerator } from '../map/MapGenerator';
-import type { AuraInstance } from '../map/effects/PlayerAuraPlugin';
+import type { AuraInstance } from '../effects/PlayerAura';
 import {
 	simulatePlayerMovement,
 	type GameState,
@@ -12,6 +11,7 @@ import {
 	ClientMessage,
 	ServerMessage,
 	type Vec3d,
+	type World,
 	PLAYER_ACCESS_RADIUS,
 	createMoveInput,
 	createMovementState,
@@ -19,31 +19,28 @@ import {
 
 import type { ModelAssetLibrary } from '../assets/ModelAssetLibrary';
 import {
-	createPlayerAnimationController,
-	type PlayerAnimationController,
+	createPlayerModel,
+	type PlayerAnimations,
 } from '../assets/PlayerAnimation';
-import { models } from '../assets/models';
 import { SceneManager } from '../scenes/SceneManager';
 import { CombatRenderer } from '../combat/CombatRenderer';
-import { CombatAssetLibrary } from '../combat/CombatAssetLibrary';
-import { WeaponAttachmentRenderer } from '../combat/WeaponAttachmentRenderer';
-import { AsyncViewRegistry } from '../combat/AsyncViewRegistry';
+import { AsyncViewRegistry } from '../AsyncViewRegistry';
+import { smoothingFactor, smoothTowards } from '../ServerSmoothing';
 import { CleanupBag, CleanupRegistry } from '../CleanupBag';
 import {
 	STORAGE_COLYSEUS_ROOM_ID_STR,
 	STORAGE_COLYSEUS_TOKEN_ID_STR,
 } from '../server/NetworkManager';
 
+const REMOTE_PLAYER_SMOOTHING_SPEED = 10;
+
 class RemotePlayerView {
 	readonly mesh: BABYLON.AbstractMesh;
-	readonly animations: PlayerAnimationController;
+	readonly animations: PlayerAnimations;
 	private moving: boolean | null = null;
 	private downed: boolean | null = null;
 
-	constructor(
-		mesh: BABYLON.AbstractMesh,
-		animations: PlayerAnimationController,
-	) {
+	constructor(mesh: BABYLON.AbstractMesh, animations: PlayerAnimations) {
 		this.mesh = mesh;
 		this.animations = animations;
 	}
@@ -117,17 +114,15 @@ export class ServerOrchestrator {
 	private readonly scene: BABYLON.Scene;
 	private readonly remoteTargets = new Map<string, RemoteTarget>();
 	private readonly remotePlayers = new AsyncViewRegistry<RemotePlayerView>();
-	private mapGen!: MapGenerator;
+	private world!: World;
 	private readonly room: COLYSEUS.Room<GameState>;
 	private player!: BABYLON.AbstractMesh;
-	private combatRenderer!: CombatRenderer;
-	private weaponAttachments!: WeaponAttachmentRenderer;
-	private combatAssets!: CombatAssetLibrary;
+	private combat!: CombatRenderer;
 	private readonly pendingInputs: MoveInput[] = [];
 	private readonly recycledInputs: MoveInput[] = [];
 	private pendingInputHead = 0;
 	private readonly unsentPredictionInput = createMoveInput();
-	private readonly playerAssets: ModelAssetLibrary;
+	private readonly modelLibrary: ModelAssetLibrary;
 	private readonly auras: AuraInstance[] = [];
 	private readonly subscriptions = new CleanupBag();
 	private readonly playerSubscriptions = new CleanupRegistry<string>();
@@ -157,17 +152,16 @@ export class ServerOrchestrator {
 	constructor(
 		scene: BABYLON.Scene,
 		room: COLYSEUS.Room<GameState>,
-		playerAssets: ModelAssetLibrary,
+		modelLibrary: ModelAssetLibrary,
 	) {
 		this.scene = scene;
 		this.room = room;
-		this.playerAssets = playerAssets;
+		this.modelLibrary = modelLibrary;
 	}
 
 	setPlayer(player: BABYLON.AbstractMesh) {
 		this.player = player;
 		this.hasLastReconciliation = false;
-		this.weaponAttachments.attachToPlayer(this.room.sessionId);
 	}
 
 	sendMovementInput(input: MoveInput): void {
@@ -207,74 +201,46 @@ export class ServerOrchestrator {
 
 	private async addRemotePlayer(sessionId: string) {
 		await this.remotePlayers.add(sessionId, async () => {
-			const result = await this.playerAssets.instantiate(
-				models.player,
+			const { root, animations } = await createPlayerModel(
+				this.modelLibrary,
 				`remotePlayer:${sessionId}`,
 			);
-			const model = result.root;
-			model.rotationQuaternion = null;
-			const animations = createPlayerAnimationController(
-				model,
-				result.animationGroups,
-			);
-			animations.playIdle();
-			this.mapGen.prepareRenderable(model);
-			return new RemotePlayerView(model, animations);
+			return new RemotePlayerView(root, animations);
 		});
 		const view = this.remotePlayers.get(sessionId);
-		if (!view) return null;
-		this.weaponAttachments.attachToPlayer(sessionId);
-		return view;
+		return view ?? null;
 	}
 
 	updateRemotePlayers(deltaTime: number) {
-		const lerpFactor = Math.min(1, deltaTime * 10);
+		const factor = smoothingFactor(
+			REMOTE_PLAYER_SMOOTHING_SPEED,
+			deltaTime,
+		);
 		this.remotePlayers.forEach(({ mesh }, sessionId) => {
 			const target = this.remoteTargets.get(sessionId);
 			if (!target) return;
-			mesh.position.x = BABYLON.Scalar.Lerp(
-				mesh.position.x,
-				target.x,
-				lerpFactor,
-			);
-			mesh.position.y = BABYLON.Scalar.Lerp(
-				mesh.position.y,
-				target.y,
-				lerpFactor,
-			);
-			mesh.position.z = BABYLON.Scalar.Lerp(
-				mesh.position.z,
-				target.z,
-				lerpFactor,
-			);
-			const targetRotation = target.rotationY + Math.PI;
+			smoothTowards(mesh.position, target.x, target.y, target.z, factor);
 			mesh.rotation.y = BABYLON.Scalar.LerpAngle(
 				mesh.rotation.y,
-				targetRotation,
-				lerpFactor,
+				target.rotationY,
+				factor,
 			);
 		});
 	}
 
 	private removeRemotePlayer(sessionId: string) {
-		this.weaponAttachments.removePlayer(sessionId);
+		this.combat.removePlayer(sessionId);
 		this.remotePlayers.remove(sessionId);
 		this.remoteTargets.delete(sessionId);
 	}
 
-	async connect(seed: number) {
-		this.mapGen = new MapGenerator(this.scene, seed);
-		this.combatAssets = new CombatAssetLibrary(this.scene, this.mapGen);
-		this.weaponAttachments = new WeaponAttachmentRenderer(
-			this.combatAssets,
-		);
-		this.combatRenderer = new CombatRenderer(
+	async connect(world: World) {
+		this.world = world;
+		this.combat = new CombatRenderer(
 			this.scene,
 			this.room,
-			this.combatAssets,
-			this.weaponAttachments,
+			this.modelLibrary,
 		);
-		this.combatRenderer.listen();
 		this.subscriptions.add(
 			this.room.onMessage(ServerMessage.GameOver, () => {
 				if (this.gameOverHandled) return;
@@ -285,10 +251,6 @@ export class ServerOrchestrator {
 				SceneManager.toEndScreen(this.room);
 			}),
 		);
-	}
-
-	getMapGen() {
-		return this.mapGen;
 	}
 
 	getRoom() {
@@ -305,20 +267,12 @@ export class ServerOrchestrator {
 		players.forEach((player, sessionId) => {
 			const aura = player.aura;
 			if (!aura || aura.radius <= 0) return;
-			let x = player.x;
-			let z = player.z;
-			if (sessionId === this.room.sessionId) {
-				if (this.player) {
-					x = this.player.position.x;
-					z = this.player.position.z;
-				}
-			} else {
-				const view = this.remotePlayers.get(sessionId);
-				if (view) {
-					x = view.mesh.position.x;
-					z = view.mesh.position.z;
-				}
-			}
+			const mesh =
+				sessionId === this.room.sessionId
+					? this.player
+					: this.remotePlayers.get(sessionId)?.mesh;
+			const x = mesh?.position.x ?? player.x;
+			const z = mesh?.position.z ?? player.z;
 			const output = this.auras[count++];
 			if (output) {
 				output.x = x;
@@ -373,7 +327,7 @@ export class ServerOrchestrator {
 		state.velocityY = authoritativeState.velocityY;
 		state.isGrounded = authoritativeState.isGrounded;
 
-		const world = this.mapGen.getWorld();
+		const world = this.world;
 		this.movementBoundary.centerX = this.room.state.rayX;
 		this.movementBoundary.centerZ = this.room.state.rayZ;
 
@@ -489,11 +443,8 @@ export class ServerOrchestrator {
 					this.setRemoteTarget(sessionId, player);
 					mesh.position.x = player.x;
 					mesh.position.z = player.z;
-					mesh.position.y = this.mapGen.getGroundHeight(
-						player.x,
-						player.z,
-					);
-					mesh.rotation.y = player.rotationY + Math.PI;
+					mesh.position.y = this.world.height(player.x, player.z);
+					mesh.rotation.y = player.rotationY;
 					view.setDowned(player.isDowned);
 					view.setMoving(player.animState === 'moving');
 					subscriptions.add(
@@ -524,11 +475,7 @@ export class ServerOrchestrator {
 	): void {
 		subscriptions.add(
 			callbacks.onAdd(player, 'weapons', (weapon) =>
-				this.weaponAttachments.attachWeapon(
-					sessionId,
-					getMesh(),
-					weapon.kind,
-				),
+				this.combat.attachHeldWeapon(sessionId, getMesh(), weapon.kind),
 			),
 		);
 	}
@@ -560,9 +507,7 @@ export class ServerOrchestrator {
 	dispose() {
 		this.subscriptions.dispose();
 		this.playerSubscriptions.dispose();
-		this.combatRenderer?.dispose();
-		this.weaponAttachments?.dispose();
-		this.combatAssets?.dispose();
+		this.combat?.dispose();
 		this.remotePlayers.dispose();
 		this.remoteTargets.clear();
 		this.pendingInputs.length = 0;

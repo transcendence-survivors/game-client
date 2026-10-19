@@ -3,10 +3,10 @@ import * as BABYLON from '@babylonjs/core';
 import * as COLYSEUS from '@colyseus/sdk';
 import '@babylonjs/loaders/glTF/2.0';
 import { InputManager } from '../server/InputManager';
-import { MapGenerator } from '../map/MapGenerator';
+import { MapRenderer } from '../map/MapRenderer';
+import { PlayerAura } from '../effects/PlayerAura';
 import { DebugMenu } from '../hud/DebugMenu';
 import { ServerOrchestrator } from '../server/ServerOrchestrator';
-import { NatureRenderer } from '../map/nature/NatureRenderer';
 import { MonsterRenderer } from '../monsters/MonsterRenderer';
 
 import {
@@ -22,10 +22,9 @@ import {
 import { SettingsMenuRender } from '../settings/SettingsMenuRender';
 import { ModelAssetLibrary } from '../assets/ModelAssetLibrary';
 import {
-	createPlayerAnimationController,
-	type PlayerAnimationController,
+	createPlayerModel,
+	type PlayerAnimations,
 } from '../assets/PlayerAnimation';
-import { models } from '../assets/models';
 import { Hud } from '../hud/Hud';
 import { LevelUpMenu } from '../hud/LevelUpMenu';
 import { StatsPanel } from '../hud/StatsPanel';
@@ -39,8 +38,8 @@ import {
 
 import { CleanupBag } from '../CleanupBag';
 import { NetworkInputCadence } from '../performance/NetworkInputCadence';
-import { LevelUpShaderEffect } from '../effects/LevelUpShaderEffect';
-import { createGameMusic } from '../audio/GameMusic';
+import { LevelUpPulse } from '../effects/LevelUpPulse';
+import { GameMusic } from '../audio/GameMusic';
 import { MobileControls, type MobileAction } from '../hud/MobileControls';
 import { watchInitSeq } from '../server/NetworkManager';
 import { SceneManager } from './SceneManager';
@@ -64,16 +63,16 @@ export class GameScene {
 	private camera!: BABYLON.ArcRotateCamera;
 	private input!: InputManager;
 	private player!: BABYLON.AbstractMesh;
-	private mapGen!: MapGenerator;
-	private nature!: NatureRenderer;
+	private map!: MapRenderer;
+	private aura!: PlayerAura;
 	private debugMenu!: DebugMenu;
-	private playerAssets!: ModelAssetLibrary;
+	private modelLibrary!: ModelAssetLibrary;
 
 	public keybinds: KeyBindings = { ...DEFAULT_KEY_BINDINGS };
 
 	private settings!: SettingsMenuRender;
 
-	private playerAnimations!: PlayerAnimationController;
+	private playerAnimations!: PlayerAnimations;
 
 	private seq = 0;
 	private jumpKeyWasPressed = false;
@@ -131,7 +130,7 @@ export class GameScene {
 				if (!this.disposed) SceneManager.toLobby();
 			});
 			this.scene = this.track(new BABYLON.Scene(this.engine));
-			const music = this.track(createGameMusic());
+			const music = this.track(new GameMusic());
 			this.createCamera();
 
 			const me = room.state.players.get(room.sessionId);
@@ -142,46 +141,54 @@ export class GameScene {
 				}),
 			);
 
-			this.playerAssets = this.track(new ModelAssetLibrary(this.scene));
+			this.modelLibrary = this.track(new ModelAssetLibrary(this.scene));
 			this.defer(() => room.leave());
 			this.server = this.track(
-				new ServerOrchestrator(this.scene, room, this.playerAssets),
+				new ServerOrchestrator(this.scene, room, this.modelLibrary),
 			);
-			const seedReady = this.server.connect(seed);
+			this.map = this.track(
+				new MapRenderer(this.scene, seed, this.modelLibrary),
+			);
+			this.aura = new PlayerAura(this.map.terrainMaterial);
+			new BABYLON.FxaaPostProcess('fxaa', 1.0, this.camera);
+			this.scene.blockMaterialDirtyMechanism = true;
+			const seedReady = this.server.connect(this.map.world);
 
 			if (this.disposed) return;
 			this.debugMenu = this.track(
-				new DebugMenu(
-					this.engine,
-					this.scene,
-					() =>
-						this.monsters?.getDebugStats() ?? {
-							total: room.state.monsters.size,
-							elites: 0,
-							bosses: 0,
-							rendered: 0,
-						},
-				),
+				new DebugMenu(this.engine, this.scene, () => {
+					const stats = {
+						total: room.state.monsters.size,
+						elites: 0,
+						bosses: 0,
+						rendered: this.monsters?.getRenderedCount() ?? 0,
+					};
+					room.state.monsters.forEach(({ rank }) => {
+						if (rank === 'elite') stats.elites++;
+						if (rank === 'boss') stats.bosses++;
+					});
+					return stats;
+				}),
 			);
 
 			await seedReady;
 			if (this.disposed) return;
-			this.mapGen = this.track(this.server.getMapGen());
 
 			await this.addPlayer();
 			if (this.disposed) return;
 
 			this.server.setPlayer(this.player);
-			this.track(new LevelUpShaderEffect(this.scene, this.player, room));
-			this.nature = this.track(
-				new NatureRenderer(this.mapGen, this.playerAssets),
-			);
+			this.track(new LevelUpPulse(this.scene, this.player, room));
 			this.input = this.track(new InputManager(this.scene));
 			this.server.listenToState();
 			this.monsters = this.track(
-				new MonsterRenderer(this.scene, room, this.mapGen),
+				new MonsterRenderer(
+					this.scene,
+					room,
+					this.map.world,
+					this.modelLibrary,
+				),
 			);
-			this.monsters.listen();
 
 			this.hud = this.track(new Hud(this.scene, room));
 			this.statsPanel = this.track(new StatsPanel(this.scene, room));
@@ -284,7 +291,7 @@ export class GameScene {
 			let radius = CAMERA_RADIUS;
 			for (let i = 1; i <= CAMERA_PROBES; i++) {
 				const probe = (CAMERA_RADIUS * i) / CAMERA_PROBES;
-				const ground = this.mapGen.getGroundHeight(
+				const ground = this.map.world.height(
 					target.x + dirX * probe,
 					target.z + dirZ * probe,
 				);
@@ -395,7 +402,7 @@ export class GameScene {
 			}
 			this.downedLastFrame = downed;
 			const currentState = this.server.getMovementState();
-			const world = this.mapGen.getWorld();
+			const world = this.map.world;
 			this.movementBoundary.centerX = room.state.rayX;
 			this.movementBoundary.centerZ = room.state.rayZ;
 			const newState = simulatePlayerMovement(
@@ -451,9 +458,9 @@ export class GameScene {
 				this.networkInputCadence.pendingDeltaTime(),
 			);
 			const { rayX, rayY, rayZ } = room.state;
-			this.mapGen.syncFromRoom(rayX, rayY, rayZ);
+			this.map.followRay(rayX, rayY, rayZ);
 			this.server.updateRemotePlayers(deltaTime);
-			this.mapGen.updateAuras(this.server.collectAuras(), deltaTime);
+			this.aura.update(this.server.collectAuras(), deltaTime);
 			this.monsters.update(deltaTime);
 			const cameraTarget = this.camera.target;
 			if (
@@ -463,7 +470,6 @@ export class GameScene {
 			)
 				cameraTarget.copyFrom(playerPosition);
 			this.clampCameraToTerrain(deltaTime);
-			this.nature.update();
 			this.hud.update();
 			this.statsPanel.update();
 			this.updateReviveIntent(downed);
@@ -511,36 +517,20 @@ export class GameScene {
 	}
 
 	private async addPlayer() {
-		const result = await this.playerAssets.instantiate(
-			models.player,
+		const { root, animations } = await createPlayerModel(
+			this.modelLibrary,
 			'localPlayer',
 		);
-		const model = result.root;
-		const room = this.server.getRoom();
-		const existingPlayer = room.state.players.get(room.sessionId);
 		const spawn = this.server.getLocalSpawn();
-		const startX = existingPlayer?.x ?? spawn?.x ?? 0;
-		const startZ = existingPlayer?.z ?? spawn?.z ?? 0;
-		const startY =
-			existingPlayer?.y ??
-			spawn?.y ??
-			this.mapGen.getGroundHeight(startX, startZ);
-		model.position = new BABYLON.Vector3(startX, startY, startZ);
-		model.scaling = new BABYLON.Vector3(1, 1, 1);
-		model.isVisible = true;
-		model.rotationQuaternion = null;
-		this.camera.lockedTarget = model;
-		this.player = model;
-		this.playerAnimations = createPlayerAnimationController(
-			model,
-			result.animationGroups,
-		);
-		this.playerAnimations.playIdle();
-		this.defer(() => this.playerAnimations.dispose());
-		this.mapGen.prepareRenderable(model);
-		this.server.setMovementState(
-			createMovementState(startX, startY, startZ),
-		);
+		const x = spawn?.x ?? 0;
+		const z = spawn?.z ?? 0;
+		const y = spawn?.y ?? this.map.world.height(x, z);
+		root.position.set(x, y, z);
+		this.camera.lockedTarget = root;
+		this.player = root;
+		this.playerAnimations = animations;
+		this.defer(() => animations.dispose());
+		this.server.setMovementState(createMovementState(x, y, z));
 	}
 
 	private boundOnClick = () => {
@@ -557,22 +547,21 @@ export class GameScene {
 
 	private boundOnMouseMove = (e: MouseEvent) => {
 		if (this.settings.isOpen()) return;
-		const canvas = this.engine.getRenderingCanvas();
-
-		const sensitivity = 0.0025;
-
-		if (document.pointerLockElement === canvas) {
-			this.camera.alpha -= e.movementX * sensitivity;
-			this.camera.beta -= e.movementY * sensitivity;
-			this.camera.beta = Math.max(
-				this.camera.lowerBetaLimit as number,
-				Math.min(
-					this.camera.upperBetaLimit as number,
-					this.camera.beta,
-				),
-			);
-		}
+		if (document.pointerLockElement === this.engine.getRenderingCanvas())
+			this.rotateCamera(e.movementX, e.movementY, 0.0025);
 	};
+
+	private rotateCamera(dx: number, dy: number, sensitivity: number) {
+		const { lowerBetaLimit, upperBetaLimit } = this.camera;
+		this.camera.alpha -= dx * sensitivity;
+		this.camera.beta = Math.max(
+			lowerBetaLimit as number,
+			Math.min(
+				upperBetaLimit as number,
+				this.camera.beta - dy * sensitivity,
+			),
+		);
+	}
 
 	private isActionPressed(action: MobileAction & keyof KeyBindings) {
 		return (
@@ -606,15 +595,7 @@ export class GameScene {
 				const deltaY = event.clientY - this.touchCameraLastY;
 				this.touchCameraLastX = event.clientX;
 				this.touchCameraLastY = event.clientY;
-				this.camera.alpha -= deltaX * TOUCH_CAMERA_SENSITIVITY;
-				this.camera.beta -= deltaY * TOUCH_CAMERA_SENSITIVITY;
-				this.camera.beta = Math.max(
-					this.camera.lowerBetaLimit as number,
-					Math.min(
-						this.camera.upperBetaLimit as number,
-						this.camera.beta,
-					),
-				);
+				this.rotateCamera(deltaX, deltaY, TOUCH_CAMERA_SENSITIVITY);
 			} else if (
 				pointerInfo.type === BABYLON.PointerEventTypes.POINTERUP
 			) {

@@ -2,7 +2,7 @@ import { clamp01 } from '@transcendence/game-shared';
 import { HUD_BAR_FILL_PERCENT } from './HudConstants';
 
 interface BossHealthCandidate {
-	isBoss: boolean;
+	rank: string;
 	life: { current: number };
 }
 
@@ -11,7 +11,7 @@ const padTimeComponent = (value: number): string =>
 
 export function isLivingBoss(monster: BossHealthCandidate): boolean {
 	return (
-		monster.isBoss &&
+		monster.rank === 'boss' &&
 		Number.isFinite(monster.life.current) &&
 		monster.life.current > 0
 	);

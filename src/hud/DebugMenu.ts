@@ -2,7 +2,6 @@ import * as GUI from '@babylonjs/gui';
 import * as BABYLON from '@babylonjs/core';
 import { createFullscreenUi } from '../assets/ui';
 import { HUD_THEME, hudText, styleHudPanel } from '../hud/HudTheme';
-import type { MonsterRendererStats } from '../monsters/MonsterRenderer';
 import { FrameTimeHistory } from '../performance/FrameTimeHistory';
 import { gameI18n } from '../i18n';
 
@@ -27,12 +26,12 @@ interface DebugStats {
 	monsters: GUI.TextBlock;
 }
 
-const EMPTY_MONSTER_STATS: Readonly<MonsterRendererStats> = {
-	total: 0,
-	elites: 0,
-	bosses: 0,
-	rendered: 0,
-};
+export interface MonsterDebugStats {
+	total: number;
+	elites: number;
+	bosses: number;
+	rendered: number;
+}
 
 export class DebugMenu {
 	private static readonly UPDATE_INTERVAL_MS = 100;
@@ -58,7 +57,7 @@ export class DebugMenu {
 	private currentGpuFrameMs: number | null = null;
 	private lastDrawCalls = 0;
 	private lastGpuCounterCount = 0;
-	private readonly getMonsterStats: () => Readonly<MonsterRendererStats>;
+	private readonly getMonsterStats: () => MonsterDebugStats;
 	private readonly keyDownHandler = (event: KeyboardEvent) => {
 		if (event.code !== 'F3' || event.repeat) return;
 		event.preventDefault();
@@ -69,8 +68,7 @@ export class DebugMenu {
 	constructor(
 		engine: BABYLON.Engine,
 		scene: BABYLON.Scene,
-		getMonsterStats: () => Readonly<MonsterRendererStats> = () =>
-			EMPTY_MONSTER_STATS,
+		getMonsterStats: () => MonsterDebugStats,
 	) {
 		this.engine = engine;
 		this.gpuTimingSupported = Boolean(engine.getCaps().timerQuery);

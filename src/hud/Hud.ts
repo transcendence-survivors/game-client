@@ -163,7 +163,7 @@ export class Hud {
 		);
 		this.subscriptions.add(
 			callbacks.onAdd('monsters', (monster, monsterId) => {
-				if (monster.isBoss)
+				if (monster.rank === 'boss')
 					this.bindBoss(callbacks, monster, monsterId);
 			}),
 		);
