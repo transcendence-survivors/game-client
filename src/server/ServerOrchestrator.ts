@@ -126,7 +126,7 @@ export class ServerOrchestrator {
 	private readonly auras: AuraInstance[] = [];
 	private readonly subscriptions = new CleanupBag();
 	private readonly playerSubscriptions = new CleanupRegistry<string>();
-	private gameOverHandled = false;
+	gameOverHandled = false;
 	private movementState: MovementState = createMovementState();
 	private readonly reconciliationState = createMovementState();
 	private readonly movementBoundary: MovementBoundary = {

@@ -127,7 +127,8 @@ export class GameScene {
 	private async init(room: COLYSEUS.Room<GameState>, seed: number) {
 		try {
 			room.onLeave(() => {
-				if (!this.disposed) SceneManager.toLobby();
+				if (!this.disposed && !this.server?.gameOverHandled)
+					SceneManager.toLobby();
 			});
 			this.scene = this.track(new BABYLON.Scene(this.engine));
 			const music = this.track(new GameMusic());

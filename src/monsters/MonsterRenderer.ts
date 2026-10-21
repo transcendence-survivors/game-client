@@ -23,13 +23,10 @@ export class MonsterRenderer {
 	private readonly damageNumbers: DamageNumbers;
 	private readonly subscriptions = new CleanupBag();
 	private readonly monsterViews = new Map<string, MonsterView>();
-	private readonly modelBatches = new Map<
-		string,
-		Promise<MonsterModelBatch>
-	>();
-	private readonly loadedModelBatches = new Set<MonsterModelBatch>();
+	private readonly modelBatches = new Map<string, MonsterModelBatch>();
 	private readonly removalDelaysS = new Map<MonsterView, number>();
 	private renderedCount = 0;
+	private disposed = false;
 
 	constructor(
 		scene: BABYLON.Scene,
@@ -42,23 +39,19 @@ export class MonsterRenderer {
 		this.world = world;
 		this.modelLibrary = modelLibrary;
 		this.damageNumbers = new DamageNumbers(scene);
-		for (const assets of getAllMonsterAssets()) {
-			const pending = MonsterModelBatch.load(
-				this.scene,
-				this.modelLibrary,
-				assets,
-			);
-			this.modelBatches.set(assets.id, pending);
-			pending.then(
-				(batch) => this.loadedModelBatches.add(batch),
+		for (const assets of getAllMonsterAssets())
+			MonsterModelBatch.load(this.scene, this.modelLibrary, assets).then(
+				(batch) => {
+					if (this.disposed) return batch.dispose();
+					this.modelBatches.set(assets.id, batch);
+					this.monsterViews.forEach((view) => this.attachModel(view));
+				},
 				(error) => console.error(`monster model '${assets.id}'`, error),
 			);
-		}
 		const callbacks = COLYSEUS.Callbacks.get(room);
 		this.subscriptions.add(
-			callbacks.onAdd(
-				'monsters',
-				(monster, id) => void this.addMonster(monster, id),
+			callbacks.onAdd('monsters', (monster, id) =>
+				this.addMonster(monster, id),
 			),
 			callbacks.onRemove('monsters', (_monster, id) => {
 				const view = this.monsterViews.get(id);
@@ -81,7 +74,7 @@ export class MonsterRenderer {
 		const camera = this.scene.activeCamera;
 		const planes = this.scene.frustumPlanes;
 		this.renderedCount = 0;
-		for (const batch of this.loadedModelBatches) {
+		for (const batch of this.modelBatches.values()) {
 			batch.beginFrame();
 			let visibleCount = 0;
 			for (const view of batch.monsters) {
@@ -100,31 +93,31 @@ export class MonsterRenderer {
 	}
 
 	dispose(): void {
+		this.disposed = true;
 		this.subscriptions.dispose();
 		this.monsterViews.clear();
-		for (const pending of this.modelBatches.values())
-			pending.then(
-				(batch) => batch.dispose(),
-				() => {},
-			);
+		this.modelBatches.forEach((batch) => batch.dispose());
 		this.modelBatches.clear();
 		this.damageNumbers.dispose();
 	}
 
-	private async addMonster(monster: Monster, id: string): Promise<void> {
+	private addMonster(monster: Monster, id: string): void {
 		const view = new MonsterView(
 			id,
 			monster,
-			this.world.height(monster.x, monster.z),
+			this.world,
 			this.room.state.combatTimeS,
 		);
 		this.monsterViews.set(id, view);
-		const modelId = getMonsterDefinition(monster.kind)?.modelId;
-		const pending = modelId ? this.modelBatches.get(modelId) : undefined;
-		if (!pending)
+		if (!getMonsterDefinition(monster.kind))
 			return console.error(`unknown monster model '${monster.kind}'`);
-		const batch = await pending.catch(() => null);
-		if (!batch || this.monsterViews.get(id) !== view) return;
+		this.attachModel(view);
+	}
+
+	private attachModel(view: MonsterView): void {
+		const modelId = getMonsterDefinition(view.monster.kind)!.modelId;
+		const batch = this.modelBatches.get(modelId);
+		if (view.modelBatch || !batch) return;
 		view.modelBatch = batch;
 		batch.monsters.add(view);
 	}

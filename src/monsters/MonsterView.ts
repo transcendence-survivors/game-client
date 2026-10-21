@@ -36,13 +36,14 @@ export class MonsterView {
 	constructor(
 		id: string,
 		monster: Monster,
-		groundY: number,
+		world: World,
 		combatTimeS: number,
 	) {
 		this.id = id;
 		this.monster = monster;
 		this.scale = monster.modelScale;
 		this.scaling = new BABYLON.Vector3(this.scale, this.scale, -this.scale);
+		const groundY = world.height(monster.x, monster.z);
 		this.position = new BABYLON.Vector3(monster.x, groundY, monster.z);
 		this.rotationY = monster.rotationY;
 		this.serverState = monster.animState;

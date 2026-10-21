@@ -37,6 +37,10 @@ export class CombatRenderer {
 	private readonly heldWeapons =
 		new AsyncViewRegistry<BABYLON.TransformNode>();
 	private readonly subscriptions = new CleanupBag();
+	private readonly attackAnimations = new Map<
+		WeaponKind,
+		BABYLON.Animation
+	>();
 
 	constructor(
 		scene: BABYLON.Scene,
@@ -118,7 +122,7 @@ export class CombatRenderer {
 		this.scene.stopAnimation(motionNode);
 		this.scene.beginDirectAnimation(
 			motionNode,
-			[this.createAttackAnimation(weapon, config)],
+			[this.attackAnimation(weapon, config)],
 			0,
 			config.frames[config.frames.length - 1],
 			false,
@@ -127,10 +131,12 @@ export class CombatRenderer {
 		);
 	}
 
-	private createAttackAnimation(
+	private attackAnimation(
 		weapon: WeaponKind,
 		config: AttackAnimationConfig,
 	): BABYLON.Animation {
+		const cached = this.attackAnimations.get(weapon);
+		if (cached) return cached;
 		const animation = new BABYLON.Animation(
 			`${weapon}Attack`,
 			`${config.property}.${config.axis}`,
@@ -147,6 +153,7 @@ export class CombatRenderer {
 		const easing = new BABYLON.QuadraticEase();
 		easing.setEasingMode(config.easing);
 		animation.setEasingFunction(easing);
+		this.attackAnimations.set(weapon, animation);
 		return animation;
 	}
 
